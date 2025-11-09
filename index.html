@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App de Orçamentos - Personalizados (Estável)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f0f2f5; color: #333; }
+        header { background: #007bff; color: white; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        nav { display: flex; justify-content: center; background: #0056b3; }
+        nav button { background: none; border: none; color: white; padding: 12px 20px; cursor: pointer; font-size: 16px; transition: background 0.3s; }
+        nav button.active { background: #007bff; font-weight: bold; }
+        nav button:hover { background: #004085; }
+        .tab { display: none; padding: 20px; background: white; margin: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+        .tab.active { display: block; }
+        /* Formulário e Inputs */
+        label { display: block; margin-top: 10px; font-weight: 600; color: #555; }
+        input[type="text"], input[type="number"], input[type="date"], select { 
+            margin: 5px 0 15px 0; padding: 10px; width: calc(100% - 20px); 
+            border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; 
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus { border-color: #007bff; outline: none; }
+        
+        /* Botões */
+        .btn { 
+            background: #28a745; color: white; border: none; padding: 10px 15px; 
+            cursor: pointer; border-radius: 4px; font-size: 16px; margin-top: 10px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #218838; }
+        .btn-danger { background: #dc3545; margin-left: 5px; }
+        .btn-danger:hover { background: #c82333; }
+        
+        /* Tabelas */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background: #e9ecef; color: #495057; font-weight: bold; }
+        
+        /* Itens Específicos */
+        #totalOrcamento { font-size: 1.5em; color: #007bff; font-weight: bold; }
+
+        /* Responsividade básica */
+        @media (max-width: 600px) {
+            nav { flex-direction: column; }
+            nav button { width: 100%; }
+            .tab { margin: 10px 5px; padding: 15px; }
+            th, td { padding: 8px; font-size: 0.9em; }
+        }
+    </style>
+</head>
+<body>
+
+<header><h1>💰 Sistema de Orçamentos - Personalizados</h1></header>
+<nav id="mainNav">
+    <button onclick="showTab('orcamento', this)">Orçamento</button>
+    <button onclick="showTab('relatorio', this)">Relatório</button>
+    <button onclick="showTab('produto', this)">Produto</button>
+    <button onclick="showTab('insumo', this)">Insumo</button>
+</nav>
+
+<div id="orcamento" class="tab">
+    <h2>📝 Novo Orçamento</h2>
+    <label for="dataOrcamento">Data:</label>
+    <input type="date" id="dataOrcamento" required>
+    <label for="clienteNome">Cliente:</label>
+    <input type="text" id="clienteNome" placeholder="Nome do cliente" required>
+    
+    <hr>
+    <h3>Adicionar Item</h3>
+    <label for="produtoSelect">Selecione o Produto:</label>
+    <select id="produtoSelect"></select>
+    <label for="qtdProduto">Quantidade:</label>
+    <input type="number" id="qtdProduto" min="1" value="1">
+    <button class="btn" onclick="adicionarAoOrcamento()">Adicionar ao Orçamento</button>
+    
+    <h3>Itens do Orçamento</h3>
+    <table id="tabelaOrcamento">
+        <thead>
+            <tr><th>Produto</th><th>Qtd</th><th>Preço Unitário</th><th>Total</th><th>Ações</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    
+    <h3>Total: R$ <span id="totalOrcamento">0,00</span></h3>
+    <button class="btn" onclick="salvarOrcamento()">💾 Salvar Orçamento</button>
+</div>
+
+<div id="relatorio" class="tab">
+    <h2>📊 Relatórios / Orçamentos Salvos</h2>
+    <label for="filtroCliente">Filtrar por Cliente:</label>
+    <input type="text" id="filtroCliente" onkeyup="filtrarRelatorios()" placeholder="Digite o nome do cliente...">
+    <table id="tabelaRelatorios">
+        <thead><tr><th>Data</th><th>Cliente</th><th>Total</th><th>Ações</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="produto" class="tab">
+    <h2>⚙️ Cadastro de Produtos (Precificação Markup)</h2>
+    <label for="nomeProduto">Nome do Produto:</label>
+    <input type="text" id="nomeProduto" placeholder="Nome do Produto" required>
+    
+    <label>Custo Fixo / Despesas (em R$ por Produto):</label>
+    <input type="number" id="custoFixoProduto" placeholder="Ex: 5.00 (Aluguel, luz, etc.)" value="0.00" min="0" step="0.01">
+
+    <label>Impostos / Taxas (%) sobre a Venda:</label>
+    <input type="number" id="impostoProduto" placeholder="Ex: 10 (ICMS, PIS, COFINS)" value="0" min="0" max="100" step="0.01">
+    
+    <label>Margem de Lucro Desejada (%):</label>
+    <input type="number" id="lucroProduto" placeholder="Ex: 30" min="0" max="100" value="30">
+
+    <h3>Composição de Insumos (Custo Variável)</h3>
+
+    <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+        <div style="flex-grow: 1;">
+            <label for="insumoSelect">Selecione o Insumo:</label>
+            <select id="insumoSelect" style="margin-bottom: 0;">
+                <option value="">--- Selecione um Insumo ---</option>
+            </select>
+        </div>
+        <div style="width: 150px;">
+            <label for="qtdInsumoAdicionar">Qtd Usada:</label>
+            <input type="number" id="qtdInsumoAdicionar" min="0.01" step="0.01" value="1" style="margin-bottom: 0;">
+        </div>
+        <button class="btn" style="height: 40px; margin-top: 25px;" onclick="adicionarInsumoAoProduto()">+</button>
+    </div>
+
+    <table id="tabelaComposicao">
+        <thead>
+            <tr><th>Insumo</th><th>Qtd Usada</th><th>Custo Unitário</th><th>Custo Parcial</th><th>Ações</th></tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    
+    <button class="btn" onclick="salvarProduto()">Salvar Produto e Calcular Preço</button>
+
+    <h3>Produtos Cadastrados</h3>
+    <table id="tabelaProdutos">
+        <thead><tr><th>Nome</th><th>C. Insumos</th><th>C. Total</th><th>Margem %</th><th>Preço Venda</th><th>Ações</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="insumo" class="tab">
+    <h2>📦 Controle de Insumos</h2>
+    <label for="nomeInsumo">Nome do Insumo:</label>
+    <input type="text" id="nomeInsumo" placeholder="Nome do Insumo" required>
+    <label for="custoInsumo">Custo Unitário (R$):</label>
+    <input type="number" id="custoInsumo" placeholder="Custo Unitário" min="0" step="0.01" required>
+    <label for="estoqueInsumo">Quantidade em Estoque:</label>
+    <input type="number" id="estoqueInsumo" placeholder="Quantidade em Estoque" min="0" required>
+    <label for="dataCompraInsumo">Data de Compra:</label>
+    <input type="date" id="dataCompraInsumo">
+    <button class="btn" onclick="salvarInsumo()">Salvar Insumo</button>
+    
+    <h3>Insumos Cadastrados</h3>
+    <table id="tabelaInsumos">
+        <thead><tr><th>Nome</th><th>Custo</th><th>Estoque</th><th>Data Compra</th><th>Ações</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+// --- MECANISMO DE FALLBACK PARA LOCALSTORAGE (Correção para iOS/Modo Privado) ---
+const storage = {
+    _data: {}, 
+    _isAvailable: (function() {
+        try {
+            const test = '__storage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        } catch (e) {
+            console.warn('❌ LocalStorage bloqueado (provavelmente no modo privado do Safari). Os dados serão salvos APENAS em memória e PERDIDOS ao fechar a aba.');
+            return false;
+        }
+    })(),
+
+    getItem(key) {
+        if (this._isAvailable) {
+            return localStorage.getItem(key);
+        }
+        return this._data[key] || null;
+    },
+
+    setItem(key, value) {
+        if (this._isAvailable) {
+            localStorage.setItem(key, value);
+        } else {
+            this._data[key] = value;
+        }
+    }
+};
+
+// --- VARIÁVEIS GLOBAIS E DATA STORAGE ---
+// Usando o objeto 'storage' para garantir a compatibilidade
+let produtos = JSON.parse(storage.getItem('produtos')) || [];
+let insumos = JSON.parse(storage.getItem('insumos')) || [];
+let orcamentos = JSON.parse(storage.getItem('orcamentos')) || [];
+let itensOrcamento = []; 
+let composicaoAtual = []; 
+
+const formatCurrency = (value) => `R$ ${parseFloat(value).toFixed(2).replace('.', ',')}`;
+
+// --- FUNÇÕES DE NAVEGAÇÃO E UX ---
+
+function showTab(tabId, button) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+
+    document.querySelectorAll('#mainNav button').forEach(btn => btn.classList.remove('active'));
+    if (button) {
+        button.classList.add('active');
+    }
+    
+    if (tabId !== 'produto') {
+        composicaoAtual = [];
+        atualizarTabelaComposicao(); 
+    }
+
+    atualizarTabelas();
+}
+
+function filtrarRelatorios() {
+    const filtro = document.getElementById('filtroCliente').value.toLowerCase();
+    const rows = document.querySelectorAll('#tabelaRelatorios tbody tr');
+    
+    rows.forEach(row => {
+        const clienteNome = row.cells[1].textContent.toLowerCase();
+        row.style.display = clienteNome.includes(filtro) ? '' : 'none';
+    });
+}
+
+// --- FUNÇÕES DE CRUD (INSUMOS) ---
+
+function salvarInsumo() {
+    const nome = document.getElementById('nomeInsumo').value.trim();
+    const custo = parseFloat(document.getElementById('custoInsumo').value);
+    const estoque = parseFloat(document.getElementById('estoqueInsumo').value);
+    const dataCompra = document.getElementById('dataCompraInsumo').value;
+    
+    if (!nome || isNaN(custo) || custo <= 0 || isNaN(estoque) || estoque < 0 || !dataCompra) {
+        return alert('⚠️ Preencha todos os campos do insumo corretamente! Custo deve ser positivo.');
+    }
+    
+    insumos.push({ nome, custo, estoque, dataCompra });
+    storage.setItem('insumos', JSON.stringify(insumos)); // Usando 'storage'
+    
+    // Limpar formulário
+    document.getElementById('nomeInsumo').value = '';
+    document.getElementById('custoInsumo').value = '';
+    document.getElementById('estoqueInsumo').value = '';
+    document.getElementById('dataCompraInsumo').value = '';
+    
+    atualizarTabelas();
+    alert('Insumo salvo com sucesso!');
+}
+
+function deletarInsumo(i) { 
+    if (!confirm(`Tem certeza que deseja deletar o insumo "${insumos[i].nome}"?`)) return;
+    insumos.splice(i,1); 
+    storage.setItem('insumos',JSON.stringify(insumos)); // Usando 'storage'
+    atualizarTabelas(); 
+}
+
+// --- FUNÇÕES DE COMPOSIÇÃO DE PRODUTO (COMBOBOX) ---
+
+function adicionarInsumoAoProduto() {
+    const insumoNome = document.getElementById('insumoSelect').value;
+    const qtd = parseFloat(document.getElementById('qtdInsumoAdicionar').value);
+
+    if (!insumoNome) return alert('Selecione um insumo.');
+    if (isNaN(qtd) || qtd <= 0) return alert('A quantidade usada deve ser maior que zero.');
+
+    const insumo = insumos.find(i => i.nome === insumoNome);
+    if (!insumo) return alert('Insumo não encontrado.');
+
+    const itemExistenteIndex = composicaoAtual.findIndex(item => item.nome === insumoNome);
+
+    if (itemExistenteIndex > -1) {
+        composicaoAtual[itemExistenteIndex].qtd = qtd;
+    } else {
+        composicaoAtual.push({ nome: insumo.nome, qtd, custo: insumo.custo });
+    }
+
+    document.getElementById('qtdInsumoAdicionar').value = 1;
+    document.getElementById('insumoSelect').value = '';
+
+    atualizarTabelaComposicao();
+}
+
+function removerInsumoDaComposicao(index) {
+    if (!confirm('Remover insumo da composição deste produto?')) return;
+    composicaoAtual.splice(index, 1);
+    atualizarTabelaComposicao();
+}
+
+function atualizarTabelaComposicao() {
+    const tbody = document.querySelector('#tabelaComposicao tbody');
+    tbody.innerHTML = '';
+    let custoTotalInsumos = 0;
+
+    composicaoAtual.forEach((item, i) => {
+        const custoParcial = item.qtd * item.custo;
+        custoTotalInsumos += custoParcial;
+        tbody.innerHTML += `<tr>
+            <td>${item.nome}</td>
+            <td>${item.qtd}</td>
+            <td>${formatCurrency(item.custo)}</td>
+            <td>${formatCurrency(custoParcial)}</td>
+            <td><button class='btn-danger btn-sm' onclick='removerInsumoDaComposicao(${i})'>X</button></td>
+        </tr>`;
+    });
+}
+
+// --- FUNÇÕES DE CRUD (PRODUTOS E PRECIFICAÇÃO) ---
+
+function salvarProduto() {
+    const nome = document.getElementById('nomeProduto').value.trim();
+    const lucro = parseFloat(document.getElementById('lucroProduto').value);
+    const custoFixo = parseFloat(document.getElementById('custoFixoProduto').value) || 0;
+    const imposto = parseFloat(document.getElementById('impostoProduto').value) || 0;
+    
+    if (!nome || isNaN(lucro) || isNaN(custoFixo) || isNaN(imposto) || lucro < 0 || imposto < 0) {
+        return alert('⚠️ Preencha nome, lucro, custo fixo e imposto corretamente.');
+    }
+    
+    if (imposto + lucro >= 100) {
+        return alert('❌ A soma de Impostos e Lucro Desejado não pode ser igual ou superior a 100%.');
+    }
+
+    const selecionados = composicaoAtual;
+    
+    if (selecionados.length === 0) {
+        return alert('⚠️ Adicione pelo menos um insumo à composição!');
+    }
+
+    const custoInsumos = selecionados.reduce((acc, i) => acc + (i.custo * i.qtd), 0);
+    const custoTotal = custoInsumos + custoFixo; 
+
+    const percentualDespesasLucro = (imposto + lucro) / 100; 
+    const precoVenda = custoTotal / (1 - percentualDespesasLucro); 
+    
+    produtos.push({ 
+        nome, 
+        lucro, 
+        imposto, 
+        custoFixo, 
+        composicao: selecionados, 
+        custoInsumos,
+        custoTotal, 
+        precoVenda, 
+    });
+    storage.setItem('produtos', JSON.stringify(produtos)); // Usando 'storage'
+    
+    // Limpar
+    composicaoAtual = []; 
+    document.getElementById('nomeProduto').value = '';
+    document.getElementById('lucroProduto').value = '30';
+    document.getElementById('custoFixoProduto').value = '0.00';
+    document.getElementById('impostoProduto').value = '0';
+    atualizarTabelaComposicao(); 
+    
+    atualizarTabelas();
+    alert('Produto salvo e preço calculado com sucesso!');
+}
+
+function deletarProduto(i) { 
+    if (!confirm(`Tem certeza que deseja deletar o produto "${produtos[i].nome}"?`)) return;
+    produtos.splice(i,1); 
+    storage.setItem('produtos',JSON.stringify(produtos)); // Usando 'storage'
+    atualizarTabelas(); 
+}
+
+// --- FUNÇÕES DE ORÇAMENTO ---
+
+function adicionarAoOrcamento() {
+    const produtoNome = document.getElementById('produtoSelect').value;
+    const qtd = parseInt(document.getElementById('qtdProduto').value);
+    
+    if (!produtoNome || isNaN(qtd) || qtd < 1) return alert('Selecione um produto e uma quantidade válida.');
+    
+    const produto = produtos.find(p => p.nome === produtoNome);
+    if (!produto) return alert('Produto não encontrado.');
+    
+    const total = qtd * produto.precoVenda;
+    
+    const itemExistente = itensOrcamento.find(item => item.nome === produto.nome);
+    if (itemExistente) {
+        itemExistente.qtd += qtd;
+        itemExistente.total += total;
+    } else {
+        itensOrcamento.push({ nome: produto.nome, qtd, preco: produto.precoVenda, total });
+    }
+    
+    document.getElementById('qtdProduto').value = '1'; 
+    atualizarTabelaOrcamento();
+}
+
+function atualizarTabelaOrcamento() {
+    const tbody = document.querySelector('#tabelaOrcamento tbody');
+    tbody.innerHTML = '';
+    let totalGeral = 0;
+    
+    itensOrcamento.forEach((item, i) => {
+        totalGeral += item.total;
+        tbody.innerHTML += `<tr>
+            <td>${item.nome}</td>
+            <td>${item.qtd}</td>
+            <td>${formatCurrency(item.preco)}</td>
+            <td>${formatCurrency(item.total)}</td>
+            <td><button class='btn-danger btn-sm' onclick='removerItem(${i})'>X</button></td>
+        </tr>`;
+    });
+    document.getElementById('totalOrcamento').innerText = formatCurrency(totalGeral).replace('R$ ', '');
+}
+
+function removerItem(index) {
+    if (!confirm(`Remover item "${itensOrcamento[index].nome}" do orçamento?`)) return;
+    itensOrcamento.splice(index, 1);
+    atualizarTabelaOrcamento();
+}
+
+function salvarOrcamento() {
+    const data = document.getElementById('dataOrcamento').value;
+    const cliente = document.getElementById('clienteNome').value.trim();
+    
+    if (!data || !cliente || itensOrcamento.length === 0) return alert('Preencha a Data, o Cliente e adicione itens ao orçamento.');
+    
+    const total = itensOrcamento.reduce((acc, i) => acc + i.total, 0);
+    orcamentos.push({ 
+        data, 
+        cliente, 
+        itens: JSON.parse(JSON.stringify(itensOrcamento)),
+        total 
+    });
+    storage.setItem('orcamentos', JSON.stringify(orcamentos)); // Usando 'storage'
+    
+    // Limpar
+    itensOrcamento = [];
+    document.getElementById('clienteNome').value = '';
+    document.getElementById('dataOrcamento').value = new Date().toISOString().slice(0, 10);
+    
+    atualizarTabelaOrcamento();
+    atualizarTabelas();
+    alert('Orçamento salvo com sucesso!');
+}
+
+function exportarOrcamento(idx){
+    const o = orcamentos[idx];
+    const totalFormatado = formatCurrency(o.total);
+    
+    const conteudo = `
+*** ORÇAMENTO DE PRODUTOS PERSONALIZADOS ***
+Data: ${o.data}
+Cliente: ${o.cliente}
+-------------------------------------------
+Itens:
+${o.itens.map(i=>`${i.nome} - Qtd: ${i.qtd} | Preço Un: ${formatCurrency(i.preco)} | Total: ${formatCurrency(i.total)}`).join('\n')}
+-------------------------------------------
+Total: ${totalFormatado}
+`;
+    if (navigator.share) {
+        navigator.share({
+            title: `Orçamento para ${o.cliente}`,
+            text: conteudo,
+        }).catch((error) => console.log('Erro ao compartilhar:', error));
+    } else {
+        navigator.clipboard.writeText(conteudo).then(() => {
+            alert('Orçamento copiado para a área de transferência! Você pode colá-lo no WhatsApp/E-mail.');
+        }).catch(err => {
+            alert('Erro ao copiar o orçamento. Verifique se o navegador permite a cópia.');
+        });
+    }
+}
+
+// --- FUNÇÕES DE ATUALIZAÇÃO GERAL ---
+
+function atualizarTabelas() {
+    // 1. Lista de Insumos
+    const insTbody = document.querySelector('#tabelaInsumos tbody');
+    insTbody.innerHTML = insumos.map((i,idx)=>
+        `<tr>
+            <td>${i.nome}</td>
+            <td>${formatCurrency(i.custo)}</td>
+            <td>${i.estoque}</td>
+            <td>${i.dataCompra}</td>
+            <td><button class='btn-danger btn-sm' onclick='deletarInsumo(${idx})'>X</button></td>
+        </tr>`
+    ).join('');
+
+    // 2. Preenche o select de insumos (Combox)
+    const insumoSelect = document.getElementById('insumoSelect');
+    insumoSelect.innerHTML = '<option value="">--- Selecione um Insumo ---</option>';
+    insumos.forEach(i => insumoSelect.innerHTML += `<option value="${i.nome}">${i.nome} (${formatCurrency(i.custo)} un)</option>`);
+
+    // 3. Select de Produtos no Orçamento
+    const prodSel = document.getElementById('produtoSelect');
+    prodSel.innerHTML = '<option value="">--- Selecione o Produto ---</option>';
+    produtos.forEach(p => prodSel.innerHTML += `<option>${p.nome}</option>`);
+    
+    // 4. Tabela de Produtos Cadastrados
+    const prodTbody = document.querySelector('#tabelaProdutos tbody');
+    prodTbody.innerHTML = produtos.map((p,i)=>
+        `<tr>
+            <td>${p.nome}</td>
+            <td>${formatCurrency(p.custoInsumos)}</td>
+            <td>${formatCurrency(p.custoTotal)}</td>
+            <td>${p.lucro}%</td>
+            <td>${formatCurrency(p.precoVenda)}</td>
+            <td><button class='btn-danger btn-sm' onclick='deletarProduto(${i})'>X</button></td>
+        </tr>`
+    ).join('');
+
+    // 5. Tabela de Relatórios
+    const relTbody = document.querySelector('#tabelaRelatorios tbody');
+    relTbody.innerHTML = orcamentos.map((o,idx)=>
+        `<tr>
+            <td>${o.data}</td>
+            <td>${o.cliente}</td>
+            <td>${formatCurrency(o.total)}</td>
+            <td><button class='btn' onclick='exportarOrcamento(${idx})'>Compartilhar</button></td>
+        </tr>`
+    ).join('');
+    
+    filtrarRelatorios();
+}
+
+// --- INICIALIZAÇÃO ---
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('dataOrcamento').value = today;
+    
+    atualizarTabelas();
+    atualizarTabelaOrcamento();
+    atualizarTabelaComposicao();
+
+    showTab('orcamento', document.querySelector('#mainNav button'));
+});
+</script>
+</body>
+</html>
