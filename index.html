@@ -1,544 +1,3161 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>App de Orçamentos - Personalizados (Estável)</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #f0f2f5; color: #333; }
-        header { background: #007bff; color: white; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        nav { display: flex; justify-content: center; background: #0056b3; }
-        nav button { background: none; border: none; color: white; padding: 12px 20px; cursor: pointer; font-size: 16px; transition: background 0.3s; }
-        nav button.active { background: #007bff; font-weight: bold; }
-        nav button:hover { background: #004085; }
-        .tab { display: none; padding: 20px; background: white; margin: 15px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
-        .tab.active { display: block; }
-        /* Formulário e Inputs */
-        label { display: block; margin-top: 10px; font-weight: 600; color: #555; }
-        input[type="text"], input[type="number"], input[type="date"], select { 
-            margin: 5px 0 15px 0; padding: 10px; width: calc(100% - 20px); 
-            border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; 
-            transition: border-color 0.3s;
-        }
-        input:focus, select:focus { border-color: #007bff; outline: none; }
-        
-        /* Botões */
-        .btn { 
-            background: #28a745; color: white; border: none; padding: 10px 15px; 
-            cursor: pointer; border-radius: 4px; font-size: 16px; margin-top: 10px;
-            transition: background 0.3s;
-        }
-        .btn:hover { background: #218838; }
-        .btn-danger { background: #dc3545; margin-left: 5px; }
-        .btn-danger:hover { background: #c82333; }
-        
-        /* Tabelas */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
-        th { background: #e9ecef; color: #495057; font-weight: bold; }
-        
-        /* Itens Específicos */
-        #totalOrcamento { font-size: 1.5em; color: #007bff; font-weight: bold; }
+<html lang="pt-br">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<title>Gestão ProLV v3.0</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
-        /* Responsividade básica */
-        @media (max-width: 600px) {
-            nav { flex-direction: column; }
-            nav button { width: 100%; }
-            .tab { margin: 10px 5px; padding: 15px; }
-            th, td { padding: 8px; font-size: 0.9em; }
-        }
-    </style>
-</head>
-<body>
-
-<header><h1>💰 Sistema de Orçamentos - Personalizados</h1></header>
-<nav id="mainNav">
-    <button onclick="showTab('orcamento', this)">Orçamento</button>
-    <button onclick="showTab('relatorio', this)">Relatório</button>
-    <button onclick="showTab('produto', this)">Produto</button>
-    <button onclick="showTab('insumo', this)">Insumo</button>
-</nav>
-
-<div id="orcamento" class="tab">
-    <h2>📝 Novo Orçamento</h2>
-    <label for="dataOrcamento">Data:</label>
-    <input type="date" id="dataOrcamento" required>
-    <label for="clienteNome">Cliente:</label>
-    <input type="text" id="clienteNome" placeholder="Nome do cliente" required>
-    
-    <hr>
-    <h3>Adicionar Item</h3>
-    <label for="produtoSelect">Selecione o Produto:</label>
-    <select id="produtoSelect"></select>
-    <label for="qtdProduto">Quantidade:</label>
-    <input type="number" id="qtdProduto" min="1" value="1">
-    <button class="btn" onclick="adicionarAoOrcamento()">Adicionar ao Orçamento</button>
-    
-    <h3>Itens do Orçamento</h3>
-    <table id="tabelaOrcamento">
-        <thead>
-            <tr><th>Produto</th><th>Qtd</th><th>Preço Unitário</th><th>Total</th><th>Ações</th></tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-    
-    <h3>Total: R$ <span id="totalOrcamento">0,00</span></h3>
-    <button class="btn" onclick="salvarOrcamento()">💾 Salvar Orçamento</button>
-</div>
-
-<div id="relatorio" class="tab">
-    <h2>📊 Relatórios / Orçamentos Salvos</h2>
-    <label for="filtroCliente">Filtrar por Cliente:</label>
-    <input type="text" id="filtroCliente" onkeyup="filtrarRelatorios()" placeholder="Digite o nome do cliente...">
-    <table id="tabelaRelatorios">
-        <thead><tr><th>Data</th><th>Cliente</th><th>Total</th><th>Ações</th></tr></thead>
-        <tbody></tbody>
-    </table>
-</div>
-
-<div id="produto" class="tab">
-    <h2>⚙️ Cadastro de Produtos (Precificação Markup)</h2>
-    <label for="nomeProduto">Nome do Produto:</label>
-    <input type="text" id="nomeProduto" placeholder="Nome do Produto" required>
-    
-    <label>Custo Fixo / Despesas (em R$ por Produto):</label>
-    <input type="number" id="custoFixoProduto" placeholder="Ex: 5.00 (Aluguel, luz, etc.)" value="0.00" min="0" step="0.01">
-
-    <label>Impostos / Taxas (%) sobre a Venda:</label>
-    <input type="number" id="impostoProduto" placeholder="Ex: 10 (ICMS, PIS, COFINS)" value="0" min="0" max="100" step="0.01">
-    
-    <label>Margem de Lucro Desejada (%):</label>
-    <input type="number" id="lucroProduto" placeholder="Ex: 30" min="0" max="100" value="30">
-
-    <h3>Composição de Insumos (Custo Variável)</h3>
-
-    <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-        <div style="flex-grow: 1;">
-            <label for="insumoSelect">Selecione o Insumo:</label>
-            <select id="insumoSelect" style="margin-bottom: 0;">
-                <option value="">--- Selecione um Insumo ---</option>
-            </select>
-        </div>
-        <div style="width: 150px;">
-            <label for="qtdInsumoAdicionar">Qtd Usada:</label>
-            <input type="number" id="qtdInsumoAdicionar" min="0.01" step="0.01" value="1" style="margin-bottom: 0;">
-        </div>
-        <button class="btn" style="height: 40px; margin-top: 25px;" onclick="adicionarInsumoAoProduto()">+</button>
+		<style>
+			body { font-family: 'Inter', sans-serif; padding-bottom: 100px; background-color: #f8fafc; }
+			.page { display: none; }
+			.page.active { display: block; }
+			.card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 16px; margin-bottom: 12px; border: 1px solid #e2e8f0; }
+			input, select, textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 11px; padding: 10px; margin-top: 4px; margin-bottom: 12px; font-size: 14px; }
+			label { font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; }
+			.btn-primary { background-color: #2563eb; color: white; font-weight: bold; padding: 12px; border-radius: 11px; width: 100%; transition: background 0.2s; }
+			.nav-item { transition: all 0.2s; color: #64748b; }
+			.nav-item.active { color: #2563eb; font-weight: bold; border-top: 3px solid #2563eb; background: #f0f9ff; }
+			.desc-cell {
+			word-break: break-word; /* Quebra palavras muito longas */
+			overflow-wrap: break-word;
+			max-width: 90%; /* Limita a largura */
+			white-space: normal; /* Permite múltiplas linhas */
+			line-height: 1.2;
+			.table-fixed { table-layout: fixed; width: 100%; }
+			}
+			<table class="width="150px  w-full text-[12px] text-left text-black "> 
+				<thead>
+					<tr class="border-t text-[12px] bg-emerald-500">
+						<th style="width: 10%">Data</th>
+						<th style="width: 45%">Descrição</th>
+						<th style="width: 15%">Saída</th>
+						<th style="width: 15%">Entrada</th>
+						<th style="width: 15%"> </th>
+					</tr>
+				</thead>
+			</table>
+		</style>
+	</head>
+	<body>
+	<div id="login-screen" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-[9999]">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-80 text-center">
+        <h2 class="text-xl font-bold mb-4">Acesso Restrito</h2>
+        <input type="email" id="login-email" placeholder="E-mail" class="w-full p-3 mb-3 bg-slate-100 rounded-xl outline-none">
+        <input type="password" id="login-pass" placeholder="Senha" class="w-full p-3 mb-6 bg-slate-100 rounded-xl outline-none">
+        <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">ENTRAR</button>
     </div>
-
-    <table id="tabelaComposicao">
-        <thead>
-            <tr><th>Insumo</th><th>Qtd Usada</th><th>Custo Unitário</th><th>Custo Parcial</th><th>Ações</th></tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
-    
-    <button class="btn" onclick="salvarProduto()">Salvar Produto e Calcular Preço</button>
-
-    <h3>Produtos Cadastrados</h3>
-    <table id="tabelaProdutos">
-        <thead><tr><th>Nome</th><th>C. Insumos</th><th>C. Total</th><th>Margem %</th><th>Preço Venda</th><th>Ações</th></tr></thead>
-        <tbody></tbody>
-    </table>
 </div>
+		<header class="bg-white border-b p-4 sticky top-0 z-50 flex justify-between items-center shadow-sm">
+			<h1 class="font-bold text-lg text-slate-800">Sistema Gestão ProLV v3.0</h1>
+			<div id="status" class="text-[10px] px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-bold">V4.1 - FINANÇAS</div>
+		</header>
+		<main class="p-4">
+			<section id="page-budget" class="page active">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-xl font-bold text-blue-800">Orçamento</h2>
+					<button onclick="clearBudgetForm()" class="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-xs font-bold">LIMPAR / NOVO</button>
+				</div>
+				<div class="card">
+					<label>Cliente</label>
+					<select id="budget-client"></select>
+					<div class="grid grid-cols-2 gap-2">
+						<div><label>Data do Pedido</label><input type="date" id="budget-date"></div>
+						<div><label>Data de Entrega *</label><input type="date" id="budget-delivery-date" required></div>
+					</div>
+					<div class="border-y py-4 my-2">
+						<label class="text-blue-700">Adicionar Produtos</label>
+						<div class="grid grid-cols-1 gap-2">
+							<select id="budget-product-select" class="mb-0"></select>
+							<button onclick="addItemToBudget('${p.id}')" class="bg-blue-600 text-white px-5 rounded-lg font-bold">+</button>
+						
+						</div>
+						<div id="budget-items-list" class="mt-4 space-y-2"></div>
+					</div>
+					<div class="grid grid-cols-2 gap-2">
+						<div>
+							<label>Acréscimos ()</label>
+							<div class="flex gap-1">
+								<input type="number" id="budget-extra" value="0" step="0.01" oninput="calcBudgetTotal()" class="mb-0">
+								<button onclick="openCalc('budget-extra', 'Acréscimo')">🧮</button>
+							</div>
+						</div>
+						<div>
+							<label>Descontos ()</label>
+							<div class="flex gap-1">
+								<input type="number" id="budget-discount" value="0" step="0.01" oninput="calcBudgetTotal()" class="mb-0">
+								<button onclick="openCalc('budget-extra', 'Acréscimo')">🧮</button>
+							</div>
+						</div>
+					</div>
+					<div class="bg-blue-900 text-white p-5 rounded-xl text-right my-4">
+						<div class="text-[10px] uppercase opacity-70">Total do Orçamento</div>
+						<div class="text-2xl font-black italic"> <span id="total-display">0.00</span></div>
+					</div>
+					<div class="grid grid-cols-2 gap-2"></div>
 
-<div id="insumo" class="tab">
-    <h2>📦 Controle de Insumos</h2>
-    <label for="nomeInsumo">Nome do Insumo:</label>
-    <input type="text" id="nomeInsumo" placeholder="Nome do Insumo" required>
-    <label for="custoInsumo">Custo Unitário (R$):</label>
-    <input type="number" id="custoInsumo" placeholder="Custo Unitário" min="0" step="0.01" required>
-    <label for="estoqueInsumo">Quantidade em Estoque:</label>
-    <input type="number" id="estoqueInsumo" placeholder="Quantidade em Estoque" min="0" required>
-    <label for="dataCompraInsumo">Data de Compra:</label>
-    <input type="date" id="dataCompraInsumo">
-    <button class="btn" onclick="salvarInsumo()">Salvar Insumo</button>
-    
-    <h3>Insumos Cadastrados</h3>
-    <table id="tabelaInsumos">
-        <thead><tr><th>Nome</th><th>Custo</th><th>Estoque</th><th>Data Compra</th><th>Ações</th></tr></thead>
-        <tbody></tbody>
-    </table>
-</div>
-
-<script>
-// --- MECANISMO DE FALLBACK PARA LOCALSTORAGE (Correção para iOS/Modo Privado) ---
-const storage = {
-    _data: {}, 
-    _isAvailable: (function() {
-        try {
-            const test = '__storage_test__';
-            localStorage.setItem(test, test);
-            localStorage.removeItem(test);
-            return true;
-        } catch (e) {
-            console.warn('❌ LocalStorage bloqueado (provavelmente no modo privado do Safari). Os dados serão salvos APENAS em memória e PERDIDOS ao fechar a aba.');
-            return false;
-        }
-    })(),
-
-    getItem(key) {
-        if (this._isAvailable) {
-            return localStorage.getItem(key);
-        }
-        return this._data[key] || null;
-    },
-
-    setItem(key, value) {
-        if (this._isAvailable) {
-            localStorage.setItem(key, value);
-        } else {
-            this._data[key] = value;
-        }
+					<div class="mt-2">
+						<label>Observações do Pedido</label>
+						<textarea id="budget-obs" rows="3" placeholder="Ex: Entregar em mãos, embrulhar para presente..."></textarea>
+					</div>
+						
+					 <div class="bg-blue-600 p-4 rounded-xl text-center text-white mt-4 shadow-inner">
+						 <button onclick="saveBudget()" id="btn-save-budget" class="btn-primary bg-blue-700">SALVAR ORÇAMENTO</button>
+						
+			</div>
+					<div id="payment-section" class="hidden border-t pt-4 mt-4">
+						<label class="text-green-700">Gestão Financeira</label>
+						<button onclick="openPaymentModal(state.editingBudgetId)" class="bg-green-600 text-white px-4 py-3 rounded-lg font-bold w-full">REGISTRAR PAGAMENTO</button>
+						<div class="mt-4 bg-slate-50 p-3 rounded-lg border">
+							<h4 class="text-[10px] font-bold uppercase mb-2">Resumo Financeiro</h4>
+							<div id="history-list" class="mt-2 space-y-1"></div>
+						</div>
+					<div class="grid grid-cols-1 gap-2 mt-4">
+						<div id="budget-actions" class="hidden grid grid-cols-2 gap-2">
+							<button onclick="produceBudget(state.editingBudgetId)" id="btn-produce" class="bg-blue-500 text-white py-3 rounded-xl font-bold col-span-2 mb-2">🏭 PRODUZIR (BAIXA ESTOQUE)</button>
+							<button onclick="generateBudgetPDF(state.editingBudgetId)" 	class="bg-red-600 text-white py-3 rounded-xl font-bold"> 📄 PDF </button>
+							<button onclick="sendBudgetWhatsApp(state.editingBudgetId)" class="bg-green-600 text-white py-3 rounded-xl font-bold"> 	📱 WhatsApp
+							</button>
+							</div>
+					</div>
+				</div>
+			</section>
+			<section id="page-saved" class="page">
+				<h2 class="text-xl font-bold mb-4 text-blue-800">Orçamentos Salvos</h2>
+				<div id="saved-list" class="space-y-3"></div>
+				<div id="insumos-summary-container" class="mb-6"></div>
+			</section>
+			<section id="page-products" class="page">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-xl font-bold">Produtos</h2>
+					<button onclick="openProductModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Novo</button>
+				</div>
+				<div id="products-list" class="space-y-3"></div>
+			</section>
+			<section id="page-insumos" class="page">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-xl font-bold">Insumos</h2>
+					<div class="flex gap-2">
+						<button onclick="openInsumoModal()" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-xs">+ Novo</button>
+						<button onclick="openBuyInsumoModal()" class="bg-orange-600 text-white px-3 py-2 rounded-lg text-xs">🛒 Compra</button>
+					</div>
+				</div>
+				<div id="insumos-list" class="space-y-3"></div>
+			</section>
+			<section id="page-clients" class="page">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-xl font-bold">Clientes</h2>
+					<button onclick="openClientModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Novo</button>
+				</div>
+				<div id="clients-list" class="space-y-3"></div>
+			</section>
+			<section id="page-clients-list" class="page">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-xl font-bold">Clientes</h2>
+					<button onclick="openClientModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">+ Novo</button>
+				</div>
+				<div id="clients-list" class="space-y-3"></div>
+			</section>
+			<section id="page-accounting" class="page">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-xl font-bold">Contabilidade</h2>
+					<button onclick="openAccountingModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold">+ NOVO LANÇAMENTO</button>
+				</div>
+				<div id="accounting-table-container"></div>
+			</section>
+			<section id="page-config" class="page">	
+				<h2 class="text-xl font-bold mb-4 text-blue-800">Configurações</h2>
+				<div id="config-content" class="space-y-4"></div>
+			</section>
+		</main>
+		<nav class="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around items-center h-20 text-[12px] z-50 shadow-2xl">
+			<button onclick="showPage('budget')" class="nav-item flex flex-col items-center flex-1 py-2 active"><span>💰</span>Orçamentos</button>
+			<button onclick="showPage('saved')" class="nav-item flex flex-col items-center flex-1 py-2"><span>📚</span>Salvos</button>
+			<button onclick="showPage('products')" class="nav-item flex flex-col items-center flex-1 py-2"><span>📦</span>Produtos</button>
+			<button onclick="showPage('insumos')" class="nav-item flex flex-col items-center flex-1 py-2"><span>📋</span>Insumos</button>
+			<button onclick="showPage('clients')" class="nav-item flex flex-col items-center flex-1 py-2"><span>👥</span>Clientes</button>
+			<button onclick="showPage('accounting')" class="nav-item flex flex-col items-center flex-1 py-2"><span>📊</span>Contab.</button>
+			<button onclick="showPage('config')" class="nav-item flex flex-col items-center flex-1 py-2"><span>⚙️</span>Config</button>
+		</nav>
+		<div id="modal-overlay" class="fixed inset-0 bg-blue/60 hidden z-[60] flex items-center justify-center p-4">
+			<div class="bg-blue-200 rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" id="modal-content"></div>
+		</div>
+		<script>
+			const firebaseConfig = {
+				apiKey: "AIzaSyDar9Fty6E7DHjMw0x0dx-GDJ1E2qPWpEc",
+				authDomain: "leve-ventania.firebaseapp.com",
+				databaseURL: "https://leve-ventania-default-rtdb.firebaseio.com",
+				projectId: "leve-ventania",
+				storageBucket: "leve-ventania.firebasestorage.app",
+				messagingSenderId: "599652489376",
+				appId: "1:599652489376:web:3ab22e96f9942eca7091c5"
+			};
+			firebase.initializeApp(firebaseConfig);
+			const db = firebase.database();
+			
+			let state = { insumos: [], produtos: [], clientes: [], orcamentos: [], contabilidade: [], config: {}, editingBudgetId: null };
+			let currentItems = [];
+			let tempComp = [];
+			let budgetItems = []; // Array que armazenará os produtos do orçamento atual
+let totalBudget = 0;  // Variável para o total acumulado
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function init() {
+				db.ref('/').on('value', (snapshot) => {
+					const data = snapshot.val() || {};
+					state.insumos = data.insumos ? Object.entries(data.insumos).map(([id, v]) => ({ id, ...v })) : [];
+					state.produtos = data.produtos ? Object.entries(data.produtos).map(([id, v]) => ({ id, ...v })) : [];
+					state.clientes = data.clientes ? Object.entries(data.clientes).map(([id, v]) => ({ id, ...v })) : [];
+					state.orcamentos = data.orcamentos ? Object.entries(data.orcamentos).map(([id, v]) => ({ id, ...v })) : [];
+					state.contabilidade = data.contabilidade ? Object.entries(data.contabilidade).map(([id, v]) => ({ id, ...v })) : [];
+					state.config = data.config || {};
+					state.company = data.company || {}; // Adicione esta linha
+					renderAll();
+				});
+				document.getElementById('budget-date').value = new Date().toISOString().split('T')[0];
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			async function inicializarBancoContabilidade() {
+				const ref = db.ref('contabilidade');
+				const snapshot = await ref.once('value');
+				
+				if (!snapshot.exists()) {
+					console.log("Criando dados iniciais de contabilidade...");
+					const dadosIniciais = {
+						"exemplo_1": {
+							date: "2023-10-01",
+							description: "Venda Inicial de Teste",
+							type: "Receita",
+							value: 1500.00
+						},
+						"exemplo_2": {
+							date: "2023-10-05",
+							description: "Pagamento Aluguel",
+							type: "Despesa",
+							value: 800.00
+						}
+					};
+					await ref.set(dadosIniciais);
+					alert("Banco de dados de contabilidade inicializado com sucesso!");
+					} else {
+					console.log("O banco de dados já possui registros.");
+				}
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			// Função para processar o login
+async function handleLogin() {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-pass').value;
+    try {
+        await firebase.auth().signInWithEmailAndPassword(email, pass);
+        document.getElementById('login-screen').style.display = 'none';
+    } catch (e) {
+        alert("Acesso negado: " + e.message);
     }
-};
-
-// --- VARIÁVEIS GLOBAIS E DATA STORAGE ---
-// Usando o objeto 'storage' para garantir a compatibilidade
-let produtos = JSON.parse(storage.getItem('produtos')) || [];
-let insumos = JSON.parse(storage.getItem('insumos')) || [];
-let orcamentos = JSON.parse(storage.getItem('orcamentos')) || [];
-let itensOrcamento = []; 
-let composicaoAtual = []; 
-
-const formatCurrency = (value) => `R$ ${parseFloat(value).toFixed(2).replace('.', ',')}`;
-
-// --- FUNÇÕES DE NAVEGAÇÃO E UX ---
-
-function showTab(tabId, button) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-
-    document.querySelectorAll('#mainNav button').forEach(btn => btn.classList.remove('active'));
-    if (button) {
-        button.classList.add('active');
-    }
-    
-    if (tabId !== 'produto') {
-        composicaoAtual = [];
-        atualizarTabelaComposicao(); 
-    }
-
-    atualizarTabelas();
 }
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-function filtrarRelatorios() {
-    const filtro = document.getElementById('filtroCliente').value.toLowerCase();
-    const rows = document.querySelectorAll('#tabelaRelatorios tbody tr');
-    
-    rows.forEach(row => {
-        const clienteNome = row.cells[1].textContent.toLowerCase();
-        row.style.display = clienteNome.includes(filtro) ? '' : 'none';
-    });
-}
-
-// --- FUNÇÕES DE CRUD (INSUMOS) ---
-
-function salvarInsumo() {
-    const nome = document.getElementById('nomeInsumo').value.trim();
-    const custo = parseFloat(document.getElementById('custoInsumo').value);
-    const estoque = parseFloat(document.getElementById('estoqueInsumo').value);
-    const dataCompra = document.getElementById('dataCompraInsumo').value;
-    
-    if (!nome || isNaN(custo) || custo <= 0 || isNaN(estoque) || estoque < 0 || !dataCompra) {
-        return alert('⚠️ Preencha todos os campos do insumo corretamente! Custo deve ser positivo.');
-    }
-    
-    insumos.push({ nome, custo, estoque, dataCompra });
-    storage.setItem('insumos', JSON.stringify(insumos)); // Usando 'storage'
-    
-    // Limpar formulário
-    document.getElementById('nomeInsumo').value = '';
-    document.getElementById('custoInsumo').value = '';
-    document.getElementById('estoqueInsumo').value = '';
-    document.getElementById('dataCompraInsumo').value = '';
-    
-    atualizarTabelas();
-    alert('Insumo salvo com sucesso!');
-}
-
-function deletarInsumo(i) { 
-    if (!confirm(`Tem certeza que deseja deletar o insumo "${insumos[i].nome}"?`)) return;
-    insumos.splice(i,1); 
-    storage.setItem('insumos',JSON.stringify(insumos)); // Usando 'storage'
-    atualizarTabelas(); 
-}
-
-// --- FUNÇÕES DE COMPOSIÇÃO DE PRODUTO (COMBOBOX) ---
-
-function adicionarInsumoAoProduto() {
-    const insumoNome = document.getElementById('insumoSelect').value;
-    const qtd = parseFloat(document.getElementById('qtdInsumoAdicionar').value);
-
-    if (!insumoNome) return alert('Selecione um insumo.');
-    if (isNaN(qtd) || qtd <= 0) return alert('A quantidade usada deve ser maior que zero.');
-
-    const insumo = insumos.find(i => i.nome === insumoNome);
-    if (!insumo) return alert('Insumo não encontrado.');
-
-    const itemExistenteIndex = composicaoAtual.findIndex(item => item.nome === insumoNome);
-
-    if (itemExistenteIndex > -1) {
-        composicaoAtual[itemExistenteIndex].qtd = qtd;
+// Verifica se já está logado ao abrir o app
+firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+        document.getElementById('login-screen').style.display = 'none';
+        init(); // Chama a sua função que carrega os dados
     } else {
-        composicaoAtual.push({ nome: insumo.nome, qtd, custo: insumo.custo });
+        document.getElementById('login-screen').style.display = 'flex';
     }
-
-    document.getElementById('qtdInsumoAdicionar').value = 1;
-    document.getElementById('insumoSelect').value = '';
-
-    atualizarTabelaComposicao();
-}
-
-function removerInsumoDaComposicao(index) {
-    if (!confirm('Remover insumo da composição deste produto?')) return;
-    composicaoAtual.splice(index, 1);
-    atualizarTabelaComposicao();
-}
-
-function atualizarTabelaComposicao() {
-    const tbody = document.querySelector('#tabelaComposicao tbody');
-    tbody.innerHTML = '';
-    let custoTotalInsumos = 0;
-
-    composicaoAtual.forEach((item, i) => {
-        const custoParcial = item.qtd * item.custo;
-        custoTotalInsumos += custoParcial;
-        tbody.innerHTML += `<tr>
-            <td>${item.nome}</td>
-            <td>${item.qtd}</td>
-            <td>${formatCurrency(item.custo)}</td>
-            <td>${formatCurrency(custoParcial)}</td>
-            <td><button class='btn-danger btn-sm' onclick='removerInsumoDaComposicao(${i})'>X</button></td>
-        </tr>`;
-    });
-}
-
-// --- FUNÇÕES DE CRUD (PRODUTOS E PRECIFICAÇÃO) ---
-
-function salvarProduto() {
-    const nome = document.getElementById('nomeProduto').value.trim();
-    const lucro = parseFloat(document.getElementById('lucroProduto').value);
-    const custoFixo = parseFloat(document.getElementById('custoFixoProduto').value) || 0;
-    const imposto = parseFloat(document.getElementById('impostoProduto').value) || 0;
-    
-    if (!nome || isNaN(lucro) || isNaN(custoFixo) || isNaN(imposto) || lucro < 0 || imposto < 0) {
-        return alert('⚠️ Preencha nome, lucro, custo fixo e imposto corretamente.');
-    }
-    
-    if (imposto + lucro >= 100) {
-        return alert('❌ A soma de Impostos e Lucro Desejado não pode ser igual ou superior a 100%.');
-    }
-
-    const selecionados = composicaoAtual;
-    
-    if (selecionados.length === 0) {
-        return alert('⚠️ Adicione pelo menos um insumo à composição!');
-    }
-
-    const custoInsumos = selecionados.reduce((acc, i) => acc + (i.custo * i.qtd), 0);
-    const custoTotal = custoInsumos + custoFixo; 
-
-    const percentualDespesasLucro = (imposto + lucro) / 100; 
-    const precoVenda = custoTotal / (1 - percentualDespesasLucro); 
-    
-    produtos.push({ 
-        nome, 
-        lucro, 
-        imposto, 
-        custoFixo, 
-        composicao: selecionados, 
-        custoInsumos,
-        custoTotal, 
-        precoVenda, 
-    });
-    storage.setItem('produtos', JSON.stringify(produtos)); // Usando 'storage'
-    
-    // Limpar
-    composicaoAtual = []; 
-    document.getElementById('nomeProduto').value = '';
-    document.getElementById('lucroProduto').value = '30';
-    document.getElementById('custoFixoProduto').value = '0.00';
-    document.getElementById('impostoProduto').value = '0';
-    atualizarTabelaComposicao(); 
-    
-    atualizarTabelas();
-    alert('Produto salvo e preço calculado com sucesso!');
-}
-
-function deletarProduto(i) { 
-    if (!confirm(`Tem certeza que deseja deletar o produto "${produtos[i].nome}"?`)) return;
-    produtos.splice(i,1); 
-    storage.setItem('produtos',JSON.stringify(produtos)); // Usando 'storage'
-    atualizarTabelas(); 
-}
-
-// --- FUNÇÕES DE ORÇAMENTO ---
-
-function adicionarAoOrcamento() {
-    const produtoNome = document.getElementById('produtoSelect').value;
-    const qtd = parseInt(document.getElementById('qtdProduto').value);
-    
-    if (!produtoNome || isNaN(qtd) || qtd < 1) return alert('Selecione um produto e uma quantidade válida.');
-    
-    const produto = produtos.find(p => p.nome === produtoNome);
-    if (!produto) return alert('Produto não encontrado.');
-    
-    const total = qtd * produto.precoVenda;
-    
-    const itemExistente = itensOrcamento.find(item => item.nome === produto.nome);
-    if (itemExistente) {
-        itemExistente.qtd += qtd;
-        itemExistente.total += total;
-    } else {
-        itensOrcamento.push({ nome: produto.nome, qtd, preco: produto.precoVenda, total });
-    }
-    
-    document.getElementById('qtdProduto').value = '1'; 
-    atualizarTabelaOrcamento();
-}
-
-function atualizarTabelaOrcamento() {
-    const tbody = document.querySelector('#tabelaOrcamento tbody');
-    tbody.innerHTML = '';
-    let totalGeral = 0;
-    
-    itensOrcamento.forEach((item, i) => {
-        totalGeral += item.total;
-        tbody.innerHTML += `<tr>
-            <td>${item.nome}</td>
-            <td>${item.qtd}</td>
-            <td>${formatCurrency(item.preco)}</td>
-            <td>${formatCurrency(item.total)}</td>
-            <td><button class='btn-danger btn-sm' onclick='removerItem(${i})'>X</button></td>
-        </tr>`;
-    });
-    document.getElementById('totalOrcamento').innerText = formatCurrency(totalGeral).replace('R$ ', '');
-}
-
-function removerItem(index) {
-    if (!confirm(`Remover item "${itensOrcamento[index].nome}" do orçamento?`)) return;
-    itensOrcamento.splice(index, 1);
-    atualizarTabelaOrcamento();
-}
-
-function salvarOrcamento() {
-    const data = document.getElementById('dataOrcamento').value;
-    const cliente = document.getElementById('clienteNome').value.trim();
-    
-    if (!data || !cliente || itensOrcamento.length === 0) return alert('Preencha a Data, o Cliente e adicione itens ao orçamento.');
-    
-    const total = itensOrcamento.reduce((acc, i) => acc + i.total, 0);
-    orcamentos.push({ 
-        data, 
-        cliente, 
-        itens: JSON.parse(JSON.stringify(itensOrcamento)),
-        total 
-    });
-    storage.setItem('orcamentos', JSON.stringify(orcamentos)); // Usando 'storage'
-    
-    // Limpar
-    itensOrcamento = [];
-    document.getElementById('clienteNome').value = '';
-    document.getElementById('dataOrcamento').value = new Date().toISOString().slice(0, 10);
-    
-    atualizarTabelaOrcamento();
-    atualizarTabelas();
-    alert('Orçamento salvo com sucesso!');
-}
-
-function exportarOrcamento(idx){
-    const o = orcamentos[idx];
-    const totalFormatado = formatCurrency(o.total);
-    
-    const conteudo = `
-*** ORÇAMENTO DE PRODUTOS PERSONALIZADOS ***
-Data: ${o.data}
-Cliente: ${o.cliente}
--------------------------------------------
-Itens:
-${o.itens.map(i=>`${i.nome} - Qtd: ${i.qtd} | Preço Un: ${formatCurrency(i.preco)} | Total: ${formatCurrency(i.total)}`).join('\n')}
--------------------------------------------
-Total: ${totalFormatado}
-`;
-    if (navigator.share) {
-        navigator.share({
-            title: `Orçamento para ${o.cliente}`,
-            text: conteudo,
-        }).catch((error) => console.log('Erro ao compartilhar:', error));
-    } else {
-        navigator.clipboard.writeText(conteudo).then(() => {
-            alert('Orçamento copiado para a área de transferência! Você pode colá-lo no WhatsApp/E-mail.');
-        }).catch(err => {
-            alert('Erro ao copiar o orçamento. Verifique se o navegador permite a cópia.');
-        });
-    }
-}
-
-// --- FUNÇÕES DE ATUALIZAÇÃO GERAL ---
-
-function atualizarTabelas() {
-    // 1. Lista de Insumos
-    const insTbody = document.querySelector('#tabelaInsumos tbody');
-    insTbody.innerHTML = insumos.map((i,idx)=>
-        `<tr>
-            <td>${i.nome}</td>
-            <td>${formatCurrency(i.custo)}</td>
-            <td>${i.estoque}</td>
-            <td>${i.dataCompra}</td>
-            <td><button class='btn-danger btn-sm' onclick='deletarInsumo(${idx})'>X</button></td>
-        </tr>`
-    ).join('');
-
-    // 2. Preenche o select de insumos (Combox)
-    const insumoSelect = document.getElementById('insumoSelect');
-    insumoSelect.innerHTML = '<option value="">--- Selecione um Insumo ---</option>';
-    insumos.forEach(i => insumoSelect.innerHTML += `<option value="${i.nome}">${i.nome} (${formatCurrency(i.custo)} un)</option>`);
-
-    // 3. Select de Produtos no Orçamento
-    const prodSel = document.getElementById('produtoSelect');
-    prodSel.innerHTML = '<option value="">--- Selecione o Produto ---</option>';
-    produtos.forEach(p => prodSel.innerHTML += `<option>${p.nome}</option>`);
-    
-    // 4. Tabela de Produtos Cadastrados
-    const prodTbody = document.querySelector('#tabelaProdutos tbody');
-    prodTbody.innerHTML = produtos.map((p,i)=>
-        `<tr>
-            <td>${p.nome}</td>
-            <td>${formatCurrency(p.custoInsumos)}</td>
-            <td>${formatCurrency(p.custoTotal)}</td>
-            <td>${p.lucro}%</td>
-            <td>${formatCurrency(p.precoVenda)}</td>
-            <td><button class='btn-danger btn-sm' onclick='deletarProduto(${i})'>X</button></td>
-        </tr>`
-    ).join('');
-
-    // 5. Tabela de Relatórios
-    const relTbody = document.querySelector('#tabelaRelatorios tbody');
-    relTbody.innerHTML = orcamentos.map((o,idx)=>
-        `<tr>
-            <td>${o.data}</td>
-            <td>${o.cliente}</td>
-            <td>${formatCurrency(o.total)}</td>
-            <td><button class='btn' onclick='exportarOrcamento(${idx})'>Compartilhar</button></td>
-        </tr>`
-    ).join('');
-    
-    filtrarRelatorios();
-}
-
-// --- INICIALIZAÇÃO ---
-document.addEventListener('DOMContentLoaded', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    document.getElementById('dataOrcamento').value = today;
-    
-    atualizarTabelas();
-    atualizarTabelaOrcamento();
-    atualizarTabelaComposicao();
-
-    showTab('orcamento', document.querySelector('#mainNav button'));
 });
-</script>
-</body>
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function formatarDataBR(dataString) {
+    if (!dataString) return "---";
+    // Se a data já vier no formato AAAA-mm-dd (do input date)
+    const partes = dataString.split('-');
+    if (partes.length === 3) {
+        return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return dataString; // Retorna original caso já esteja formatada
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+	function renderInsumosSummary() {
+    const container = document.getElementById('insumos-summary-container');
+    if (!container) return;
+
+    // 1. Filtrar orçamentos em aberto
+    const orcamentosAbertos = state.orcamentos.filter(o => o.status === 'Aberto');
+    
+    // 2. Consolidar quantitativos de insumos necessários
+    const necessidade = {};
+
+    orcamentosAbertos.forEach(o => {
+        o.items.forEach(item => {
+            const produto = state.produtos.find(p => p.id === item.productId);
+            if (produto && produto.composition) {
+                produto.composition.forEach(comp => {
+                    if (!necessidade[comp.id]) {
+                        necessidade[comp.id] = 0;
+                    }
+                    necessidade[comp.id] += (parseFloat(comp.qty) * parseFloat(item.qty));
+                });
+            }
+        });
+    });
+
+    // 3. Preparar dados para exibição (Ordem Alfabética)
+    const summaryData = state.insumos.map(insumo => {
+        const qtdNecessaria = necessidade[insumo.id] || 0;
+        const estoqueAtual = parseFloat(insumo.stock || 0);
+        const estoqueMinimo = parseFloat(insumo.minStock || 0);
+        
+        return {
+            nome: insumo.name,
+            atual: estoqueAtual,
+            necessario: qtdNecessaria,
+            minimo: estoqueMinimo,
+            insuficiente: estoqueAtual < qtdNecessaria,
+            abaixoMinimo: estoqueAtual < estoqueMinimo
+        };
+    }).sort((a, b) => a.nome.localeCompare(b.nome));
+
+    // 4. Gerar HTML da Tabela
+    let html = `
+        <div class="card bg-white shadow-md border-t-4 border-blue-600">
+            <h3 class="font-bold text-sm mb-3 text-slate-700 uppercase">📊 Necessidade de Insumos (Orçamentos em Aberto)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-[11px] text-left">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 uppercase">
+                            <th class="p-2">Insumo</th>
+                            <th class="p-2 text-center">Necessário</th>
+                            <th class="p-2 text-center">Estoque Atual</th>
+                            <th class="p-2 text-center">Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    summaryData.forEach(item => {
+        // Se não houver necessidade e o estoque estiver ok, podemos pular ou mostrar zerado
+        if (item.necessario <= 0) return;
+
+        const rowClass = item.insuficiente ? 'bg-red-100 text-red-700 font-bold' : '';
+        const stockClass = item.abaixoMinimo ? 'text-orange-600 font-bold underline' : '';
+
+        html += `
+            <tr class="border-b ${rowClass}">
+                <td class="p-2 font-medium">${item.nome}</td>
+                <td class="p-2 text-center">${item.necessario.toFixed(2)}</td>
+                <td class="p-2 text-center ${formatStock(stockClass)}">${formatStock(item.atual.toFixed(2))}</td>
+                <td class="p-2 text-center text-slate-400">${item.minimo.toFixed(2)}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-[9px] text-slate-400 mt-2">* Vermelho: Estoque insuficiente para pedidos / Laranja: Abaixo do mínimo.</p>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function openCompanyModal() {
+    const info = state.company || {};
+    showModal(`
+        <h3 class="font-bold text-lg mb-4">Dados da Empresa</h3>
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs font-bold uppercase text-slate-500">Nome da Empresa</label>
+                <input type="text" id="conf-comp-name" value="${info.name || ''}" class="w-full p-2 bg-slate-100 rounded-lg border-none">
+            </div>
+            <div>
+                <label class="text-xs font-bold uppercase text-slate-500">Telefone / WhatsApp</label>
+                <input type="text" id="conf-comp-phone" value="${info.phone || ''}" class="w-full p-2 bg-slate-100 rounded-lg border-none">
+            </div>
+            <div>
+                <label class="text-xs font-bold uppercase text-slate-500">Instagram</label>
+                <input type="text" id="conf-comp-ig" value="${info.instagram || ''}" class="w-full p-2 bg-slate-100 rounded-lg border-none">
+            </div>
+            <button onclick="saveCompanyInfo()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl mt-4">
+                SALVAR DADOS
+            </button>
+        </div>
+    `);
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function saveCompanyInfo() {
+    const name = document.getElementById('conf-comp-name')?.value.trim();
+    const phone = document.getElementById('conf-comp-phone')?.value.trim();
+    const instagram = document.getElementById('conf-comp-ig')?.value.trim();
+
+    if (!name || !phone) {
+        alert("Nome da empresa e telefone são obrigatórios.");
+        return;
+    }
+
+    const data = {
+        name,
+        phone,
+        instagram
+    };
+
+    try {
+        await db.ref('company').set(data);
+        alert("Dados da empresa salvos com sucesso!");
+        location.reload();
+    } catch (e) {
+        alert("Erro ao salvar dados da empresa: " + e.message);
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function renderPaymentHistory(o) {
+    const historyList = document.getElementById('history-list');
+    if (!historyList) return;
+
+    // Cálculos de valores
+    const totalOriginal = parseFloat(o.total || 0);
+    const totalPago = parseFloat(o.paid || 0);
+    const saldoDevedor = totalOriginal - totalPago;
+
+    // 1. Início da Tabela e Valor Inicial
+    let html = `
+        <div class="bg-white rounded-lg border p-2 mt-2">
+            <table class="w-full text-[11px] border-collapse">
+                <tbody>
+                    <tr class="border-b border-slate-100 bg-slate-50/50">
+                        <td class="py-2 px-1 text-slate-600 font-bold">VALOR INICIAL</td>
+                        <td class="py-2 px-1 text-right font-black text-slate-800"> ${totalOriginal.toFixed(2)}</td>
+                    </tr>
+    `;
+
+    // 2. RELAÇÃO DE DIAS DE PAGAMENTO (Inserida entre os totais)
+    if (o.paymentsHistory && o.paymentsHistory.length > 0) {
+        html += `
+            <tr>
+                <td colspan="2" class="py-1 px-1 bg-blue-50 text-[9px] font-bold text-blue-700 uppercase tracking-wider">
+                    Histórico de Recebimentos
+                </td>
+            </tr>`;
+        
+        o.paymentsHistory.forEach(p => {
+            html += `
+                <tr class="border-b border-slate-50 italic">
+                    <td class="py-1.5 px-2 text-blue-600">• ${p.data}
+                    <td class="py-1.5 px-1 text-right text-blue-600 font-medium">+  ${parseFloat(p.valor).toFixed(2)}</td>
+                </tr>`;
+        });
+    } else {
+        html += `
+            <tr>
+                <td colspan="2" class="py-2 px-2 text-slate-400 text-center italic border-b border-slate-50">
+                    Nenhum pagamento registrado
+                </td>
+            </tr>`;
+    }
+
+    // 3. Finalização com Total Pago e Saldo Devedor
+    html += `
+                    <tr class="border-t-2 border-slate-100">
+                        <td class="py-2 px-1 text-slate-600 font-bold uppercase">Total Pago</td>
+                        <td class="py-2 px-1 text-right font-bold text-green-600 underline"> ${totalPago.toFixed(2)}</td>
+                    </tr>
+                    <tr class="bg-red-50">
+                        <td class="py-2 px-1 font-black text-red-800 uppercase">Saldo a Pagar</td>
+                        <td class="py-2 px-1 text-right font-black text-red-600 text-sm"> ${saldoDevedor.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    historyList.innerHTML = html;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function produceBudget(id) {
+    const o = state.orcamentos.find(x => x.id === id);
+    if (!o) return;
+    if (o.status === 'Produzido' || o.status === 'Pago') return alert("Este orçamento já foi produzido ou pago.");
+
+    if (confirm("Deseja marcar como PRODUZIDO? Isso dará baixa automática no estoque dos materiais.")) {
+        try {
+            // 1. Percorre os itens do orçamento para baixar o estoque
+            for (const item of o.items) {
+                const produto = state.produtos.find(p => p.id === item.productId);
+                if (produto && produto.composition) {
+                    for (const comp of produto.composition) {
+                        const insumo = state.insumos.find(i => i.id === comp.id);
+                        if (insumo) {
+                            const novaQtd = (parseFloat(insumo.stock) || 0) - (parseFloat(comp.qty) * item.qty);
+                            await db.ref('insumos/' + insumo.id).update({ stock: novaQtd });
+                        }
+                    }
+                }
+            }
+
+            // 2. Lógica de Status Automático baseada no saldo devedor
+            const totalGeral = parseFloat(o.total || 0);
+            const totalPago = parseFloat(o.paid || 0);
+            const saldoDevedor = totalGeral - totalPago;
+
+            // Se o saldo for 0 ou menor (ex: pago a mais), vai para "Pago", senão "Produzido"
+            const novoStatus = saldoDevedor <= 0.01 ? 'Pago' : 'Produzido';
+
+            // 3. Atualiza no Firebase
+            await db.ref('orcamentos/' + id).update({ 
+                status: novoStatus,
+                produced: true // Mantém a marcação de que já passou pela produção
+            });
+
+            alert(novoStatus === 'Pago' ? "Produção registrada! Status alterado para PAGO (Saldo zerado)." : "Produção registrada e estoque atualizado!");
+            
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao processar produção.");
+        }
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// --- CONTABILIDADE (NOVA LÓGICA) ---
+			function openAccountingModal() {
+				showModal(`
+				<h3 class="font-bold mb-4">Novo Lançamento Manual</h3>
+				<label>Data</label><input type="date" id="acc-date" value="${new Date().toISOString().split('T')[0]}">
+				<label>Descrição</label><input type="text" id="acc-desc" placeholder="Ex: Pagamento Fornecedor">
+				<label>Tipo</label>
+				<select id="acc-type">
+				<option value="Receita">Entrada (Receita)</option>
+				<option value="Despesa">Saída (Despesa)</option>
+				</select>
+				<label>Valor ()</label><input type="number" id="acc-val" step="0.01">
+				<button onclick="saveAccManual()" class="btn-primary">SALVAR LANÇAMENTO</button>
+				`);
+			}
+			
+			// --- FUNÇÕES DE GERENCIAMENTO DE ORÇAMENTOS ---
+			
+			// Função para EXCLUIR orçamento
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			async function deleteBudget(id) {
+    if (!id) return;
+    if (confirm("Deseja realmente excluir este lançamento?")) {
+        try {
+            // Remove do Firebase
+            await db.ref('orcamentos/' + id).remove();
+            
+            // REMOÇÃO MANUAL DO ESTADO LOCAL (Garante que suma da tela na hora)
+            state.orcamentos = state.orcamentos.filter(o => o.id !== id);
+            
+            // Força a atualização da tela
+            renderAll(); 
+            alert("Orçamento excluído!");
+        } catch (error) {
+            alert("Erro ao excluir: " + error.message);
+        }
+    }
+}
+			
+			// Função para EDITAR orçamento (Carrega os dados de volta para a tela de criação)
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function deleteEntry(path, id) {
+    // Garante que o ID existe e não é a string "undefined" ou "null"
+    if (!id || id === 'undefined' || id === 'null') {
+        alert("Erro: Não foi possível localizar o registro no banco de dados.");
+        return;
+    }
+    
+    if (confirm("Deseja realmente excluir este registro?")) {
+        try {
+            await db.ref(`${path}/${id}`).remove();
+            alert("Excluído com sucesso!");
+        } catch (e) {
+            alert("Erro ao excluir: " + e.message);
+        }
+    }
+}
+
+function editBudget(id) {
+			 const b = state.orcamentos.find(x => x.id === id); // 'b' é definido aqui
+			 if (!b) return;
+			
+			 state.editingBudgetId = id;
+			 currentItems = [...b.items];
+			 showPage('budget');
+			
+			 setTimeout(() => {
+				const clientSelect = document.getElementById('budget-client');
+				// Forçar a atualização da lista de clientes no select antes de selecionar
+				clientSelect.innerHTML = state.clientes.map(c => 
+					`<option value="${c.id}">${c.name}</option>`).join('');
+				
+				clientSelect.value = b.clientId; // Agora o ID terá um correspondente na lista
+				
+			     document.getElementById('budget-date').value = b.date;
+			     document.getElementById('budget-extra').value = b.extraValue || 0;
+			     document.getElementById('budget-discount').value = b.discountValue || 0;
+				 document.getElementById('budget-obs').value = b.obs || '';
+				 document.getElementById('budget-delivery-date').value = b.deliveryDate || '';
+			
+			     // Mostra as seções de ações
+			     document.getElementById('payment-section').classList.remove('hidden');
+			     document.getElementById('budget-actions').classList.remove('hidden');
+				 renderPaymentHistory(b);
+			
+			     // --- LÓGICA DO BOTÃO PRODUZIR (Corrigida) ---
+				 
+			     const btnProduce = document.getElementById('btn-produce');
+			     if (btnProduce) {
+			         if (b.produced) { // Agora o código sabe quem é 'b'
+			             btnProduce.classList.add('opacity-50', 'pointer-events-none');
+			             btnProduce.innerText = "✅ PRODUZIDO";
+			             btnProduce.classList.replace('bg-blue-600', 'bg-gray-400');
+			         } else {
+			             btnProduce.classList.remove('opacity-50', 'pointer-events-none');
+			             btnProduce.innerText = "🏭 PRODUZIR";
+			             btnProduce.classList.replace('bg-gray-400', 'bg-blue-600');
+			         }
+			     }
+			
+			     renderBudgetItems(); // Esta função chamará o calcBudgetTotal que atualiza o resumo
+			 }, 100);
+			
+			}
+	//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+function calcBudgetTotal() {
+    // Soma dos itens considerando o preço unitário já com desconto (se aplicado no modal)
+    const itemsTotal = currentItems.reduce((acc, item) => {
+        return acc + (parseFloat(item.price || 0) * parseFloat(item.qty || 0));
+    }, 0);
+
+    const extra = parseFloat(document.getElementById('budget-extra').value || 0);
+    const discount = parseFloat(document.getElementById('budget-discount').value || 0);
+    const finalTotal = itemsTotal + extra - discount;
+
+    const display = document.getElementById('total-display');
+    if (display) {
+        // Criamos um resumo detalhado e alinhado à direita no ecrã
+        display.closest('.bg-blue-900').innerHTML = `
+            <div class="text-right space-y-1">
+                <div class="text-[10px] uppercase opacity-70">Subtotal Itens: R$ ${itemsTotal.toFixed(2)}</div>
+                ${extra > 0 ? `<div class="text-[10px] uppercase text-green-300">Acréscimos: + R$ ${extra.toFixed(2)}</div>` : ''}
+                ${discount > 0 ? `<div class="text-[10px] uppercase text-red-300">Desconto Global: - R$ ${discount.toFixed(2)}</div>` : ''}
+                <div class="text-[10px] uppercase opacity-70 mt-2">Total do Orçamento</div>
+                <div class="text-2xl font-black italic">R$ <span id="total-display">${finalTotal.toFixed(2)}</span></div>
+            </div>
+        `;
+    }
+    
+    return finalTotal;
+}	
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			async function saveAccManual() {
+				const desc = document.getElementById('acc-desc').value;
+				const value = parseFloat(document.getElementById('acc-val').value); // Usando 'value'
+				
+				if (!desc || isNaN(value)) return alert("Preencha descrição e valor corretamente!");
+				
+				const id = db.ref().child('contabilidade').push().key;
+				await db.ref('contabilidade/' + id).set({
+					id,
+					date: document.getElementById('acc-date').value,
+					description: desc,
+					type: document.getElementById('acc-type').value,
+					value: value // Corrigido de 'val' para 'value'
+				});
+				closeModal();
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+	function renderConfig() {
+    const container = document.getElementById('config-content');
+    if (!container) return;
+    
+    // Recupera os dados da empresa do estado (ou usa vazio se não existir)
+    const info = state.company || {};
+    
+    container.innerHTML = `
+        <div class="card">
+            <h3 class="font-bold text-sm mb-4 text-slate-700 uppercase">🏢 Dados da Empresa</h3>
+            <div class="space-y-3">
+                <div>
+                    <label>Nome da Empresa</label>
+                    <input type="text" id="conf-comp-name" value="${info.name || ''}" placeholder="Nome comercial">
+                </div>
+                <div>
+                    <label>Telefone / WhatsApp</label>
+                    <input type="text" id="conf-comp-phone" value="${info.phone || ''}" placeholder="(00) 00000-0000">
+                </div>
+                <div>
+                    <label>Instagram</label>
+                    <input type="text" id="conf-comp-ig" value="${info.instagram || ''}" placeholder="@suaempresa">
+                </div>
+                <button onclick="saveCompanyInfo()" class="btn-primary mt-2">SALVAR DADOS DA EMPRESA</button>
+            </div>
+        </div>
+    `;
+
+    // Mantém o botão de reset que você já tinha abaixo
+    container.innerHTML += `
+    <div class="card bg-red-50 border-red-200 mt-6 p-6">
+        <p class="text-[12px] text-red-800 font-black uppercase mb-2">🔥 ZONA DE PERIGO CRÍTICO</p>
+        <button onclick="resetSystemData()" class="w-full bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg">
+            APAGAR TUDO (REINICIAR BANCO)
+        </button>
+    </div>`;
+}
+
+// Nova função para salvar especificamente via tela de config
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			// Abre o modal para NOVO ou EDITAR cliente
+			function openClientModal(id = null) {
+			const client = id ? state.clientes.find(c => c.id === id) : null;
+			
+			showModal(`
+			<div class="p-2">
+			   <h3 class="font-bold text-lg mb-4 text-blue-600">${id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
+			   
+			   <div class="space-y-4">
+			       <div>
+			           <label class="block text-sm font-medium mb-1">Nome Completo</label>
+			           <input type="text" id="cli-name" value="${client?.name || ''}" class="w-full p-3 border rounded-xl" placeholder="Nome do cliente">
+			       </div>
+			       <div>
+			           <label class="block text-sm font-medium mb-1">Telefone / WhatsApp</label>
+			           <input type="text" id="cli-phone" value="${client?.phone || ''}" class="w-full p-3 border rounded-xl" placeholder="(00) 00000-0000">
+			       </div>
+			   </div>
+			   
+			   <div class="grid grid-cols-2 gap-3 mt-6">
+			       <button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold">CANCELAR</button>
+			       <button onclick="saveClient('${id || ''}')" class="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg">SALVAR</button>
+			   </div>
+			</div>
+			`);
+			}
+	//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++		
+			async function resetSystemData() {
+    const confirmacao1 = confirm("⚠️ ATENÇÃO: Isso apagará TODOS os Insumos, Produtos e Clientes do sistema!");
+    if (!confirmacao1) return;
+
+    const confirmacao2 = confirm("Tem certeza absoluta? Esta ação não pode ser desfeita e o banco de dados ficará vazio.");
+    if (!confirmacao2) return;
+
+    // Senha de segurança simples (opcional) para evitar cliques acidentais
+    const check = prompt("Digite 'APAGAR' para confirmar a exclusão total:");
+    if (check !== 'APAGAR') {
+        alert("Ação cancelada. A palavra de confirmação está incorreta.");
+        return;
+    }
+
+    try {
+        const updates = {};
+        updates['insumos'] = null;
+        updates['produtos'] = null;
+        updates['clientes'] = null;
+        updates['orcamentos'] = null; // Opcional: apaga também os orçamentos
+        updates['contabilidade'] = null; // Opcional: apaga o financeiro
+
+        await db.ref('/').update(updates);
+        
+        alert("Sistema reiniciado com sucesso! Todos os dados foram removidos.");
+        window.location.reload(); // Recarrega para limpar o estado local
+    } catch (e) {
+        alert("Erro ao apagar dados: " + e.message);
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Salva no Firebase (Diferenciando Novo de Edição para não sobrepor)
+async function saveClient(id = null) {
+    const name = document.getElementById('cli-name').value.trim();
+    const phone = document.getElementById('cli-phone').value.trim();
+
+    // VALIDAÇÃO: Verifica se o nome ou o telefone estão vazios
+    if (!name) {
+        alert("Por favor, insira o nome do cliente.");
+        return;
+    }
+
+    if (!phone) {
+        alert("O número de telefone é obrigatório para cadastrar o cliente.");
+        // Foca no campo de telefone para facilitar para o usuário
+        document.getElementById('cli-phone').focus();
+        return;
+    }
+
+    // Se passou na validação, prossegue com o salvamento
+    const finalId = (id && id !== '' && id !== 'null') ? id : db.ref().child('clientes').push().key;
+
+    const data = {
+        id: finalId,
+        name: name,
+        phone: phone
+    };
+
+    try {
+        await db.ref('clientes/' + finalId).set(data);
+        closeModal();
+        alert("Cliente salvo com sucesso!");
+    } catch (e) {
+        alert("Erro ao salvar1: " + e.message);
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function maskPhone(input) {
+    let value = input.value.replace(/\D/g, ""); // Remove tudo o que não é dígito
+    
+    if (value.length > 11) value = value.slice(0, 11); // Limita a 11 dígitos
+
+    if (value.length > 10) {
+        // Formato (00) 00000-0000
+        value = value.replace(/^(\22)(\d{5})(\d{4}).*/, "($1) $2-$3");
+        // Se preferir o formato (00) 9 0000-0000, use o regex abaixo:
+        value = value.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+    } else if (value.length > 5) {
+        value = value.replace(/^(\d{2})(\d{4})(\d{0,4})$/, "($1) $2-$3");
+    } else if (value.length > 2) {
+        value = value.replace(/^(\d{2})(\d{0,5})$/, "($1) $2");
+    } else {
+        value = value.replace(/^(\d*)$/, "$1");
+    }
+    
+    input.value = value;
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+			async function saveConfigEmpresa() {
+				const dados = {
+					nome: document.getElementById('conf-emp-nome').value,
+					cnpj: document.getElementById('conf-emp-cnpj').value,
+					fone: document.getElementById('conf-emp-fone').value,
+					endereco: document.getElementById('conf-emp-end').value
+				};
+				
+				try {
+					await db.ref('config/empresa').set(dados);
+					alert("Dados da empresa atualizados com sucesso!");
+					} catch (e) {
+					alert("Erro ao salvar2: " + e.message);
+				}
+			}
+			
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+	async function processPayment(id) {
+    const inputVal = document.getElementById('pay-val');
+    const inputMethod = document.getElementById('pay-method');
+    if (!inputVal || !id) return;
+
+    const valorPagoAgora = parseFloat(inputVal.value);
+    const metodo = inputMethod ? inputMethod.value : "Não informado";
+    const dataPagamento = new Date().toLocaleDateString('pt-BR');
+    
+    // Localiza o orçamento no estado
+    const o = state.orcamentos.find(x => x.id === id);
+    if (!o) {
+        alert("Erro: Orçamento não encontrado.");
+        return;
+    }
+
+    if (isNaN(valorPagoAgora) || valorPagoAgora <= 0) {
+        alert("Digite um valor válido");
+        return;
+    }
+
+    const historico = o.paymentsHistory || [];
+    historico.push({ data: dataPagamento, valor: valorPagoAgora, metodo: metodo });
+
+    const novoPago = (parseFloat(o.paid) || 0) + valorPagoAgora;
+    const novoStatus = novoPago >= (o.total - 0.05) ? "Pago" : "Parcial";
+
+    try {
+        // Atualiza Orçamento
+        await db.ref('orcamentos/' + id).update({
+            paid: novoPago,
+            status: novoStatus,
+            paymentsHistory: historico
+        });
+
+        // Lança na Contabilidade (Corrigido o.clientName)
+        const accId = db.ref().child('contabilidade').push().key;
+        await db.ref('contabilidade/' + accId).set({
+            id: accId,
+            date: new Date().toISOString().split('T')[0],
+            description: `Vr. ref. encomenda ${o.number} - ${o.clientName || 'Cliente'}`,
+            type: 'Receita',
+            value: valorPagoAgora
+        });
+
+        closeModal();
+        alert("Pagamento registado com sucesso!");
+    } catch (e) {
+        alert("Erro ao processar: " + e.message);
+    }
+}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+	function renderAll() {
+			// 1. Atualiza os selects de Cliente e Produtos no formulário de Orçamento
+			const budgetClientSelect = document.getElementById('budget-client');
+			if (budgetClientSelect) {
+			// Criamos uma cópia e ordenamos por nome antes de renderizar
+			const clientesOrdenadosSelect = [...state.clientes].sort((a, b) => {
+            const nomeA = (a.name || "").trim().toLowerCase();
+            const nomeB = (b.name || "").trim().toLowerCase();
+            return nomeA.localeCompare(nomeB);
+        });
+			
+			budgetClientSelect.innerHTML =
+			`<option value="">Selecione um cliente</option>` +
+			clientesOrdenadosSelect.map(c =>
+			`<option value="${c.id}">${c.name}</option>`
+			).join('');
+			}
+			const budgetProductSelect = document.getElementById('budget-product-select');
+			if (budgetProductSelect) {
+				const produtosOrdenados = [...state.produtos].sort((a, b) => {
+					const nomeA = (a.name || "").trim();
+					const nomeB = (b.name || "").trim();
+					
+					const começaComParentesesA = nomeA.startsWith('(');
+					const começaComParentesesB = nomeB.startsWith('(');
+
+					// Se um começa com "(" e o outro não, o que começa com "(" vai para baixo
+					if (começaComParentesesA && !começaComParentesesB) return 1;
+					if (!começaComParentesesA && começaComParentesesB) return -1;
+
+					// Se ambos forem iguais nesse quesito, ordena alfabeticamente normal
+					return nomeA.localeCompare(nomeB);
+				});
+
+				budgetProductSelect.innerHTML = produtosOrdenados.map(p => 
+					`<option value="${p.id}">${p.name}</option>`
+				).join('');
+			}
+			
+// 2. LISTAGEM DE ORÇAMENTOS COM OS NOVOS BOTÕES
+			const orcamentosList = document.getElementById('orcamentos-list');
+			if (orcamentosList) {
+			const orcOrd = [...state.orcamentos].reverse();
+			orcamentosList.innerHTML = orcOrd.map(o => {
+				const pago = o.paid || 0;
+				const saldo = o.total - pago;
+				const statusColor = pago >= o.total ? 'text-green-600' : (pago > 0 ? 'text-orange-500' : 'text-red-500');
+				const statusFundo = pago >= o.total ? 'border-green-500' : 'border-red-500';
+				
+				return `
+				<div class="card mb-4 border-l-4 ${statusFundo} bg-white p-4 rounded-lg shadow">
+				<div class="flex justify-between items-start mb-4">
+				<div>
+				<h3 class="font-bold text-lg text-slate-800">${o.clientName || 'Cliente'}</h3>
+				<p class="text-xs text-blue-600">${formatarDataBR(o.date) || '---'}</p>
+				</div>
+				<div class="text-right">
+				<p class="font-bold text-blue-600"> ${o.total.toFixed(2)}</p>
+				<p class="text-[10px] uppercase font-bold ${statusColor}">
+				${pago >= o.total ? 'TOTALMENTE PAGO' : `FALTA:  ${saldo.toFixed(2)}`}
+				</p>
+				</div>
+				</div>
+				
+				<div class="grid grid-cols-4 gap-2 border-t pt-3">
+				<button onclick="editBudget('${o.id}')" class="flex flex-col items-center justify-center p-2 bg-slate-50 rounded-lg hover:bg-slate-100" title="Editar">
+				<span class="text-lg">✏️</span>
+				<span class="text-[9px] font-bold uppercase text-blue-600">Editar</span>
+				</button>
+				<button onclick="processPayment('${o.id}')" class="flex flex-col items-center justify-center p-2 bg-green-50 rounded-lg hover:bg-green-100" title="Pagar">
+				<span class="text-lg">💰</span>
+				<span class="text-[9px] font-bold uppercase text-green-600">Pagar</span>
+				</button>
+				 <button onclick="generateBudgetPDF('${o.id}')" class="flex flex-col items-center justify-center p-2 bg-red-50 rounded-lg hover:bg-red-100" title="Gerar PDF2">
+					<span class="text-lg">📄</span>
+					<span class="text-[9px] font-bold uppercase text-red-600">PDF2</span>
+				</button>
+			
+			<button onclick="sendBudgetWhatsApp('${o.id}')" class="flex flex-col items-center justify-center p-2 bg-emerald-50 rounded-lg hover:bg-emerald-100" title="WhatsApp2">
+				<span class="text-lg">📱</span>
+				<span class="text-[9px] font-bold uppercase text-emerald-600">Zap</span>
+			</button>
+				</div>
+				
+				<button onclick="deleteBudget('${o.id}')" class="w-full mt-4 text-[9px] text-slate-300 hover:text-red-500 uppercase font-bold tracking-tighter">
+				Remover Orçamento permanentemente
+				</button>
+				</div>`;
+			}).join('');
+			}
+			
+			// 2. Lógica de Ordenação: Aberto > Produzido > Pago > Ordem Alfabética
+			const ordemStatus = { "Aberto": 1, "Produzido": 2, "Faturado": 3 , "Parcial": 4, "Pago": 5  };
+			
+			const orçamentosOrdenados = [...state.orcamentos].sort((a, b) => {
+			// Primeiro critério: Status
+			const pesoA = ordemStatus[a.status] || 99;
+			const pesoB = ordemStatus[b.status] || 99;
+			
+			if (pesoA !== pesoB) {
+				return pesoA - pesoB;
+			}
+
+
+			const isAbertoA = a.status === 'Aberto';
+			const isAbertoB = b.status === 'Aberto';
+											
+			const entregaA = new Date(a.deliveryDate || '9999-12-31').getTime();
+			const entregaB = new Date(b.deliveryDate || '9999-12-31').getTime();
+			
+			if (entregaA !== entregaB) {
+				return entregaA - entregaB;
+			}
+
+			// 3. Desempate por Data do Pedido
+			const dataA = new Date(a.date || '9999-12-31').getTime();
+			const dataB = new Date(b.date || '9999-12-31').getTime();
+			return dataA - dataB;
+
+		});
+			
+			
+			
+			renderList('saved-list', orçamentosOrdenados, o => {
+			const total = parseFloat(o.total || 0);
+			const pago = parseFloat(o.paid || 0);
+			const saldo = total - pago;
+			
+			return `
+			<div class="card border-l-4 ${o.status === 'Aberto' ? 'border-blue-500' : o.status === 'Produzido' ? 'border-yellow-500' : 'border-green-500'}">
+			<div class="flex justify-between items-start mb-2">
+			<div>
+			<span class="text-[9px] font-black px-2 py-0.5 rounded ${o.status === 'Pago' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}">
+			${(o.status || 'Aberto').toUpperCase()} Entrega ${o.deliveryDate ? formatarDataBR(o.deliveryDate) : 'Não informada'}
+			</span>
+			<div class="font-bold text-slate-800">Orç. ${o.number} - ${o.clientName}</div>
+			</div>
+			<div class="flex gap-3">
+			<button onclick="editBudget('${o.id}')" title="Editar">✏️</button>
+			<button onclick="deleteBudget('${o.id}')" title="Excluir">🗑️</button>
+			</div>
+			</div>
+			
+			<div class="bg-slate-50 rounded-lg p-2 mt-2 text-[11px]">
+			<table class="w-full text-left">
+			<thead>
+			<tr class="text-slate-400 border-b">
+			<th>Total</th>
+			<th>Pago</th>
+			<th class="text-right">Saldo</th>
+			</tr>
+			</thead>
+			<tbody>
+			<tr>
+			<td class="font-bold"> ${total.toFixed(2)}</td>
+			<td class="text-green-600 font-bold"> ${pago.toFixed(2)}</td>
+			<td class="text-right text-red-600 font-bold"> ${saldo.toFixed(2)}</td>
+			</tr>
+			</tbody>
+			</table>
+			</div>
+			</div>
+			`;
+			}
+			);
+			
+			// Dentro da função renderAll, na parte dos Produtos:
+			// --- PRODUTOS ORDENADOS (CORREÇÃO) ---
+const productsList = document.getElementById('products-list');
+if (productsList) {
+    // Criamos uma cópia da lista e ordenamos por nome
+    const produtosOrdenados = [...state.produtos].sort((a, b) => {
+        const nomeA = (a.name || "").trim();
+        const nomeB = (b.name || "").trim();
+        
+        const startsWithParenthesesA = nomeA.startsWith('(');
+        const startsWithParenthesesB = nomeB.startsWith('(');
+
+        // Se A começa com ( e B não, A vai para o final (retorna 1)
+        if (startsWithParenthesesA && !startsWithParenthesesB) return 1;
+        // Se B começa com ( e A não, B vai para o final (retorna -1)
+        if (!startsWithParenthesesA && startsWithParenthesesB) return -1;
+
+        // Caso contrário, ordem alfabética normal
+        return nomeA.localeCompare(nomeB);
+    });
+
+    productsList.innerHTML = produtosOrdenados.map(p => {
+        // Tenta usar o basePrice gravado. Se for 0, tenta somar os itens da composição
+        let valorCusto = p.basePrice || 0;
+        
+        if (valorCusto === 0 && p.composition) {
+            valorCusto = p.composition.reduce((acc, item) => acc + (item.qty * (item.unitPrice || 0)), 0);
+        }
+
+        return `
+            <div class="card p-4 flex justify-between items-center mb-2">
+                <div>
+                    <b class="text-slate-700 block text-sm">${p.name || "Sem Nome"}</b>
+                    <span class="text-[11px] text-slate-400 font-medium uppercase">
+                        Custo:  ${valorCusto.toFixed(2)}
+                    </span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <span class="block font-bold text-slate-900"> ${(p.finalPrice || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="openProductModal('${p.id}')" class="p-2 bg-slate-100 rounded-lg text-xs">✏️</button>
+                        <button onclick="deleteEntry('produtos', '${p.id}')" class="p-2 bg-red-50 rounded-lg text-red-500 text-xs">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+			
+// --- INSUMOS ORDENADOS (CORRIGIDO) ---
+// --- INSUMOS ORDENADOS COM DESTAQUE DE ESTOQUE MÍNIMO ---
+const insumosOrdenados = [...state.insumos].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+renderList('insumos-list', insumosOrdenados, i => {
+    const estoqueNumerico = parseFloat(i.stock || 0);
+    const estoqueMinimo = parseFloat(i.minStock || 0);
+    const estoqueVisual = i.stock > 3000 ? '∞' : estoqueNumerico.toFixed(2);
+    
+    // Lógica de Destaque: Se o estoque atual for menor que o mínimo, aplica cor vermelha e negrito
+    const alertaEstoque = estoqueNumerico < estoqueMinimo ? 'text-red-600 font-black underline' : 'text-blue-600';
+
+    return `
+    <div class="card p-2 ${estoqueNumerico < estoqueMinimo ? 'border-red-200 bg-red-50' : ''}">
+        <table class="w-full table-fixed border-collapse">
+            <tr>
+                <td class="w-[60%] text-left align-middle">
+                    <b class="text-slate-700 block truncate text-sm">${i.name || "Sem Nome"}</b>
+                    <div class="text-[10px] leading-tight ${alertaEstoque}">
+                        Estoque: ${estoqueVisual} | Mín: ${estoqueMinimo.toFixed(2)}  Compra: ${formatarDataBR(i.purchaseDate || "2025-10-01")}
+					
+                        ${estoqueNumerico < estoqueMinimo ? ' ⚠️' : ''}
+                    </div>
+                </td>
+                <td class="w-[20%] text-right align-middle px-1">
+                    <span class="font-bold text-blue-600"> ${parseFloat(i.unitPrice || 0).toFixed(2)} </span>
+                </td>
+                <td class="w-[20%] text-right align-middle">
+                    <div class="flex gap-1 justify-end">
+                        <button onclick="openInsumoModal('${i.id}')" class="p-2 bg-slate-100 rounded-lg text-xs">✏️</button>
+                        <button onclick="deleteEntry('insumos', '${i.id}')" class="p-2 bg-red-50 rounded-lg text-red-500 text-xs">🗑️</button>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div> `;
+});
+
+// --- CLIENTES ORDENADOS ---
+			const clientesOrdenados = [...state.clientes].sort((a, b) => 
+				(a.name || "").localeCompare(b.name || "")
+			);
+
+			renderList('clients-list', clientesOrdenados, c => `
+				<div class="card flex justify-between items-center hover:bg-slate-50">
+					<b class="text-slate-700 text-sm">${c.name || "Sem Nome"}</b>
+					<div class="flex gap-2">
+						<button onclick="openClientModal('${c.id}')" class="p-2 bg-slate-100 rounded-lg">✏️</button>
+						<button onclick="deleteEntry('clientes', '${c.id}')" class="p-2 bg-red-50 rounded-lg text-red-500">🗑️</button>
+					</div>
+				</div>
+			`
+			
+			);
+			renderInsumosSummary();
+			// Abre o modal para NOVO ou EDITAR cliente
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+			function openClientModal(id = null) {
+			const client = id ? state.clientes.find(c => c.id === id) : null;
+			
+			showModal(`
+			<div class="p-2">
+			   <h3 class="font-bold text-lg mb-4 text-blue-600">${id ? 'Editar Cliente' : 'Novo Cliente'}</h3>
+			   
+			   <div class="space-y-4">
+			       <div>
+			           <label class="block text-sm font-medium mb-1">Nome Completo</label>
+			           <input type="text" id="cli-name" value="${client?.name || ''}" class="w-full p-3 border rounded-xl" placeholder="Nome do cliente">
+			       </div>
+			       <div>
+			           <label class="block text-sm font-medium mb-1">Telefone / WhatsApp</label>
+			           // Procure o input de telefone dentro do seu modal e altere-o para isto:
+						<input type="text" 
+							   id="cli-phone" 
+							   value="${client?.phone || ''}" 
+							   placeholder="(00) 00000-0000" 
+							   oninput="maskPhone(this)"
+							   class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+					</div>
+			   </div>
+			   
+			   <div class="grid grid-cols-2 gap-3 mt-6">
+			       <button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold">CANCELAR</button>
+			       <button onclick="saveClient('${id || ''}')" class="bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg">SALVAR</button>
+			   </div>
+			</div>
+			`);
+			
+			}
+			
+			// Salva no Firebase (Diferenciando Novo de Edição para não sobrepor)
+			
+			// Altera o status para "Produzido"
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			// 4. BOTÃO CANCELAR NOS INSUMOS
+function renderAccountingTable() {
+    const container = document.getElementById('accounting-table-container');
+    if (!container) return;
+
+    if (!state.contabilidade || state.contabilidade.length === 0) {
+        container.innerHTML = "<p class='text-center text-slate-400 py-10 text-[10px]'>Nenhum lançamento encontrado.</p>";
+        return;
+    }
+
+    const sorted = [...state.contabilidade].sort((a, b) => new Date(a.date + 'T00:00:00') - new Date(b.date + 'T00:00:00'));
+
+    let htmlFinal = "";
+    let totalAnualIn = 0;
+    let totalAnualOut = 0;
+    let totalGeralCaixa = 0; 
+
+    const monthsData = {};
+    const monthsOrder = [];
+
+    sorted.forEach(item => {
+        const dateObj = new Date(item.date + 'T00:00:00');
+        const year = dateObj.getFullYear();
+        const monthYear = dateObj.toLocaleString('pt-br', { month: 'long', year: 'numeric' }).toUpperCase();
+
+        if (!monthsData[monthYear]) {
+            monthsData[monthYear] = { items: [], in: 0, out: 0, year: year };
+            monthsOrder.push(monthYear);
+        }
+
+        const valorAbs = Math.abs(parseFloat(item.value) || 0);
+        if (item.type === 'Receita') {
+            monthsData[monthYear].in += valorAbs;
+            totalGeralCaixa += valorAbs;
+        } else {
+            monthsData[monthYear].out += valorAbs;
+            totalGeralCaixa -= valorAbs;
+        }
+        monthsData[monthYear].items.push({...item, valorModulo: valorAbs});
+    });
+
+    monthsOrder.forEach((mLabel, index) => {
+        const data = monthsData[mLabel];
+        const nextMonth = monthsOrder[index + 1];
+        const nextYear = nextMonth ? monthsData[nextMonth].year : null;
+
+        totalAnualIn += data.in;
+        totalAnualOut += data.out;
+
+        htmlFinal += `
+            <div class="mb-4 bg-white shadow-sm overflow-hidden">
+                <div class="bg-slate-100 px-3 py-1 border-b border-slate-200">
+                    <h3 class="font-black text-[10px] text-slate-600 uppercase">${mLabel}</h3>
+                </div>
+                <table class="w-full text-[12px] border-collapse">
+                    <thead>
+                        <tr class="text-black border-b border-slate-100 bg-blue-400">
+                            <th class="text-left py-2 px-3 w-[45px]">DATA</th>
+                            <th class="text-left py-2">DESCRIÇÃO</th>
+                            <th class="text-right py-2 w-[75px]">Saída</th>
+                            <th class="text-right py-2 px-3 w-[75px]">Entrada</th>
+							<th class="py-3 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.items.map((item, i) => `
+                            <tr class="${i % 2 === 0 ? 'bg-white' : 'bg-emerald-100'} border-b border-slate-50">
+                                <td style="width: 15%" class="py-2 px-3 text-slate-400">${item.date.split('-').reverse().slice(0,2).join('/')}</td>
+                                <td  style="width: 50%"class="py-2 text-slate-700 font-medium">${item.description}</td>
+                                <td  style="width: 15%"class="py-2 text-right font-bold text-red-500">${item.type !== 'Receita' ? item.valorModulo.toFixed(2) : '-'}</td>
+                                <td  style="width: 15%"class="py-2 px-3 text-right font-bold text-green-600">${item.type === 'Receita' ? item.valorModulo.toFixed(2) : '-'}</td>
+                            <td style="width: 10% class="p-1 text-center">
+								<button onclick="editAccounting('${item.id}')" class="mr-1">✏️</button>
+								<button onclick="deleteAccounting('${item.id}')">🗑️</button>
+							</td>
+							</div>
+						</td>
+							</tr>
+                        `).join('')}
+                        <tr class="bg-slate-100 font-bold border-t-2 border-slate-500">
+                            <td colspan="2" class="py-2 px-3 text-black text-[9px]">TOTAL MENSAL</td>
+                            <td class="py-2 text-right text-red-600">${data.out.toFixed(2)}</td>
+                            <td class="py-2 px-3 text-right text-green-700">${data.in.toFixed(2)}</td>
+							<td ></td>
+                        </tr>
+                        <tr class="bg-slate-200 font-bold">
+                            <td colspan="2" class="py-1 px-3 text-right text-[9px] text-black uppercase">Saldo do Mês:</td>
+                            <td colspan="2" class="py-1 px-3 text-right text-blue-700">R$ ${(data.in - data.out).toFixed(2)}</td>
+							<td ></td>
+                       
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        // FECHAMENTO ANUAL
+        if (!nextYear || nextYear !== data.year) {
+            htmlFinal += `
+                <div class="mb-8 border-2 border-blue-600 rounded-lg overflow-hidden">
+                    <table class="w-full text-[10px] font-bold">
+                        <tr class="bg-blue-600 text-white uppercase text-[9px]">
+                            <td colspan="2" class="py-2 px-3">RESUMO ANUAL ${data.year}</td>
+                            <td class="py-2 text-right w-[75px]">SAÍDAS</td>
+                            <td class="py-2 px-3 text-right w-[75px]">ENTRADAS</td>
+                        </tr>
+                        <tr class="bg-blue-50">
+                            <td colspan="2" class="py-2 px-3 text-blue-800">TOTAIS DO ANO</td>
+                            <td class="py-2 text-right text-red-600">${totalAnualOut.toFixed(2)}</td>
+                            <td class="py-2 px-3 text-right text-green-700">${totalAnualIn.toFixed(2)}</td>
+                        </tr>
+                        <tr class="bg-white border-t border-blue-100">
+                            <td colspan="2" class="py-2 px-3 text-right text-slate-400 uppercase">SALDO FINAL ${data.year}:</td>
+                            <td colspan="2" class="py-2 px-3 text-right text-blue-800 text-sm">R$ ${(totalAnualIn - totalAnualOut).toFixed(2)}</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+            totalAnualIn = 0;
+            totalAnualOut = 0;
+        }
+    });
+
+    // RESULTADO EM CAIXA NA ÚLTIMA LINHA
+    htmlFinal += `
+        <div class="mt-10 mb-20 bg-blue-900 text-white rounded-xl p-4 shadow-xl border-b-4 border-emerald-500">
+            <div class="flex justify-between items-center">
+                <div>
+                    <div class="text-[10px] opacity-60 font-bold uppercase tracking-widest">Resultado Geral</div>
+                    <div class="text-[9px] opacity-40 italic">Saldo real acumulado em conta</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-black text-emerald-100">R$ ${totalGeralCaixa.toFixed(2)}</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = htmlFinal;
+}
+			
+			// 5. IMPORTANTE: Chama a renderização da tabela de contabilidade
+			if (typeof renderAccountingTable === "function") {
+			renderAccountingTable()
+			}
+			}
+			
+			// --- FUNÇÕES DE PDF, ZAP, AUXILIARES (IGUAIS À V4.0) ---
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+async function updateAllProductsPrices() {
+    // Percorre cada produto no estado atual
+    for (const produto of state.produtos) {
+        if (produto.composition && produto.composition.length > 0) {
+            let novoCusto = 0;
+
+            // Recalcula o custo baseado nos preços ATUAIS dos insumos no state
+            produto.composition.forEach(comp => {
+                const insumoInfo = state.insumos.find(i => i.id === comp.id);
+                if (insumoInfo) {
+                    novoCusto += parseFloat(comp.qty) * parseFloat(insumoInfo.price);
+                }
+            });
+
+            // Atualiza o Firebase se o valor mudou
+            if (novoCusto !== produto.basePrice) {
+                await db.ref('produtos/' + produto.id).update({
+                    basePrice: novoCusto,
+                    price: novoCusto // Ou aplique sua margem de lucro aqui: novoCusto * 1.3
+                });
+            }
+        }
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function renderAccounting() {
+    const container = document.getElementById('accounting-table-container');
+    if (!container) return;
+
+    // Ordenar por data (mais recente primeiro)
+    const registros = [...state.contabilidade].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    let html = `
+    <table class="w-full text-[12px] bg-white rounded-lg overflow-hidden shadow-sm">
+        <thead class="bg-slate-100 text-slate-600 uppercase text-[10px]">
+            <tr>
+                <th class="p-3 text-left">Data</th>
+                <th class="p-3 text-left">Descrição</th>
+                <th class="p-3 text-right">Valor</th>
+                <th class="p-3 text-center">Ações</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+    registros.forEach(item => {
+        const isReceita = item.type === 'Receita';
+        html += `
+            <tr class="border-t border-slate-50">
+                <td class="p-3">${item.date}</td>
+                <td class="p-3 font-medium">${item.description}</td>
+                <td class="p-3 text-right font-bold ${isReceita ? 'text-green-600' : 'text-red-600'}">
+                    ${isReceita ? '+' : '-'} R$ ${parseFloat(item.value).toFixed(2)}
+                </td>
+                <td class="p-3 text-center flex justify-center gap-2">
+                    <button onclick="editAccounting('${item.id}')" class="p-1 hover:bg-blue-50 rounded">✏️</button>
+                    <button onclick="deleteAccounting('${item.id}')" class="p-1 hover:bg-red-50 rounded">🗑️</button>
+                </td>
+            </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function generateBudgetText(budget) {
+    let msg = `*ORÇAMENTO Nº ${budget.number}*\n`;
+    msg += `------------------------------------------\n`;
+    msg += `*Produtos:*\n`;
+
+    // Percorre os itens para listar um abaixo do outro
+    budget.items.forEach(item => {
+        const nomeProd = item.name.padEnd(20, ' '); // Completa com espaços até 20 caracteres
+        const qtdProd = String(item.qty).padStart(3, ' ');
+        const totalProd = item.total.toFixed(2).padStart(10, ' ');
+        
+        msg += `${nomeProd} | ${qtdProd} un | R$ ${totalProd}\n`;
+    });
+
+    msg += `------------------------------------------\n`;
+    
+    // Alinhamento dos valores finais
+    const subtotal = budget.subtotal.toFixed(2).padStart(10, ' ');
+    const acrescimo = (budget.addition || 0).toFixed(2).padStart(10, ' ');
+    const desconto = (budget.discount || 0).toFixed(2).padStart(10, ' ');
+    const totalGeral = budget.total.toFixed(2).padStart(10, ' ');
+
+    msg += `Subtotal:      R$ ${subtotal}\n`;
+    if (budget.addition > 0) msg += `Acréscimos:    R$ ${acrescimo}\n`;
+    if (budget.discount > 0) msg += `Descontos:     R$ ${desconto}\n`;
+    msg += `------------------------------------------\n`;
+    msg += `*TOTAL FINAL:  R$ ${totalGeral}*\n\n`;
+    msg += `Obrigado pela preferência!`;
+
+    return msg;
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function generatePDF(orcId) {
+    const o = state.orcamentos.find(x => x.id === orcId);
+    const comp = state.company || {};
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Cabeçalho com Dados da Empresa
+    doc.setFontSize(18);
+    doc.text(comp.name || "Minha Empresa", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`WhatsApp: ${comp.phone || '-'} | Instagram: ${comp.instagram || '-'}`, 14, 28);
+    
+    // Número do Orçamento
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text(`ORÇAMENTO Nº: ${String(o.number || '0').padStart(4, '0')}`, 14, 40);
+    doc.setFont(undefined, 'normal');
+	doc.setFontSize(10); doc.text("Data: " + o.date.split('-').reverse().join('/') + " | Cliente: " + o.clientName, 15, 28);
+	const tableData = o.items.map(item => {
+    // 1. Tenta achar o produto atual no sistema pelo ID
+    const produtoNoSistema = state.produtos.find(p => p.id === item.productId);
+    
+    // 2. Define o nome: Prioridade para o nome atual do sistema, 
+    // depois para o nome salvo no item, e por fim o aviso de erro.
+    const nomeParaExibir = produtoNoSistema ? produtoNoSistema.name : (item.name || "Produto não encontrado");
+    
+    return [
+        nomeParaExibir,
+        item.qty.toString(),
+        `R$ ${parseFloat(item.price).toFixed(2)}`,
+        `R$ ${(item.qty * item.price).toFixed(2)}`
+    ];
+});
+doc.autoTable({ head: [['Produto', 'Qtd', 'V. Unit', 'Total']], body: tableData, startY: 40 });
+	doc.text("TOTAL: " + o.total.toFixed(2), 150, doc.lastAutoTable.finalY + 10);
+	doc.save(`Orcamento_${o.number}.pdf`);
+	}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function shareWhatsApp(id) {
+			const o = state.orcamentos.find(x => x.id === id);
+			const cli = state.clientes.find(c => c.id === o.clientId);
+			const msg = `Olá ${o.clientName}, seu orçamento 00${o.number} totaliza ${o.total.toFixed(2)}.`;
+			window.open(`https://wa.me/${cli?.phone?.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`);
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+
+async function saveInsumo(id = null) {
+	
+    const name = document.getElementById('ins-name').value;
+    const price = parseFloat(document.getElementById('ins-price').value);
+    const stock = parseFloat(document.getElementById('ins-stock').value) || 0;
+    const unit = document.getElementById('ins-unit').value;
+	const minStock = document.getElementById('ins-min').value || 0;
+    
+	let purchaseDate = document.getElementById('ins-date')?.value;
+
+    // Se não houver data, usa a atual
+    if (!purchaseDate) {
+        purchaseDate = new Date().toISOString().split('T')[0];
+    }
+
+    if (!name || isNaN(price)) {
+        alert("Preencha o nome e o preço corretamente!");
+        return;
+    }
+
+    // CORREÇÃO DO ERRO: Declaração do finalId
+   
+    const finalId = (id && id !== '' && id !== 'null') ? id : db.ref().child('insumos').push().key;
+
+    const dataInsumo = {
+        id: finalId,
+        name: name,
+        price: price,
+        stock: stock,
+		minStock: parseFloat(document.getElementById('ins-min').value) || 0,
+        unit: unit,
+        purchaseDate: purchaseDate
+    };
+
+    try {
+        // 1. Salva/Atualiza o Insumo
+        await db.ref('insumos/' + finalId).set(dataInsumo);
+
+        // 2. LANÇAMENTO DE COMPRA NA CONTABILIDADE
+        // Só lança se for um novo registro ou se você clicar em "Compra"
+        const accId = db.ref().child('contabilidade').push().key;
+        await db.ref('contabilidade/' + accId).set({
+            id: accId,
+            date: purchaseDate,
+            description: `Compra de Insumo: ${name}`,
+            type: 'Despesa',
+            value: price
+        });
+
+        alert("Insumo e Compra registados com sucesso!");
+        closeModal('modal-insumo');
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao guardar: " + error.message);
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function formatStock(value) {
+    const num = parseFloat(value) || 0;
+    if (num > 500) {
+        return "∞"; // Mostra o símbolo de infinito
+    }
+    return num; // Retorna o número normal se for 500 ou menos
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function openBuyInsumoModal() {
+			if (!state.insumos || state.insumos.length === 0) {
+			alert("Não há insumos cadastrados.");
+			return;
+			}
+			
+			// Criamos uma cópia da lista e ordenamos por nome (A-Z)
+			const insumosOrdenados = [...state.insumos].sort((a, b) => 
+			a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+			);
+			
+			showModal(`
+			<div class="p-2">
+			   <h3 class="font-bold text-lg mb-4 text-orange-600">🛒 Registrar Compra</h3>
+			   
+			   <div class="mb-4">
+			       <label class="block text-sm font-medium mb-1">Insumo (Ordem Alfabética)</label>
+			       <select id="buy-insumo-id" class="w-full p-3 border rounded-xl bg-white">
+			           ${insumosOrdenados.map(i => `<option value="${i.id}">${i.name}</option>`).join('')}
+			       </select>
+			   </div>
+			   
+			   <div class="space-y-4">
+			       <div>
+			           <label class="block text-sm font-medium mb-1">Quantidade Total Comprada</label>
+			           <input type="number" id="buy-qty" step="0.01" class="w-full p-3 border rounded-xl" placeholder="0.00">
+			       </div>
+			       <div>
+			           <label class="block text-sm font-medium mb-1">Valor Total Pago ()</label>
+			           <input type="number" id="buy-total-value" step="0.01" class="w-full p-3 border rounded-xl" placeholder="0.00">
+			       </div>
+			   </div>
+			   
+			   <div class="grid grid-cols-2 gap-3 mt-6">
+			       <button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold">CANCELAR</button>
+			       <button onclick="processBuyInsumo()" class="bg-orange-600 text-white py-3 rounded-xl font-bold">GRAVAR COMPRA</button>
+			   </div>
+			</div>
+			`);
+			}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			// 2. Processa a compra, atualiza o estoque e gera registro financeiro
+
+async function processBuyInsumo() {
+			// Referências seguras
+			const elId = document.getElementById('buy-insumo-id');
+			const elQty = document.getElementById('buy-qty');
+			const elTotal = document.getElementById('buy-total-value');
+			
+			// Verifica se os elementos existem antes de ler o .value (Evita o erro de 'null')
+			if (!elId ) {
+			alert("Erro: Id não carregados corretamente.");
+			return;
+			}
+			if (!elQty ) {
+			alert("Erro: Quantidade não carregados corretamente.");
+			return;
+			}
+			if (!elTotal) {
+			alert("Erro: Total não carregados corretamente.");
+			return;
+			}
+			
+			const id = elId.value;
+			const qtyTotal = parseFloat(elQty.value) || 0;
+			const valorPagoTotal = parseFloat(elTotal.value) || 0;
+			
+			const insumo = state.insumos.find(i => i.id === id);
+			
+			if (!insumo || qtyTotal <= 0 || valorPagoTotal <= 0) {
+			alert("Preencha a quantidade e o valor total da compra.");
+			return;
+			}
+			
+			const novoValorUnitario = valorPagoTotal / qtyTotal;
+			const estoqueAtual = parseFloat(insumo.stock) || 0;
+			const novoEstoque = estoqueAtual + qtyTotal;
+			
+			try {
+			// 1. Atualiza o cadastro do Insumo
+			await db.ref('insumos/' + id).update({
+			   stock: novoEstoque,
+			   unitPrice: novoValorUnitario,
+			   purchaseDate: getDataAtualISO() // opcional, mas recomendado
+			});
+			await updateLinkedProducts(id);
+			// 2. Registra o Valor Total na Contabilidade como Despesa
+			const accId = db.ref().child('contabilidade').push().key;
+			await db.ref('contabilidade/' + accId).set({
+			   id: accId,
+			   date: new Date().toISOString().split('T')[0],
+			   description: `Vr. ref. aquis. ${insumo.name} (${qtyTotal})`,
+			   type: 'Despesa',
+			   value: valorPagoTotal
+			});
+			
+			alert("Compra registrada e estoque atualizado!");
+			closeModal();
+			} catch (e) {
+			alert("Erro ao salvar no banco: " + e.message);
+			}
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+	function openInsumoModal(id = null) {
+    const insumo = id ? state.insumos.find(i => i.id === id) : null;
+    
+    showModal(`
+        <h3 class="font-bold text-lg mb-4 text-blue-600">${id ? 'Editar Insumo' : 'Novo Insumo'}</h3>
+        <div class="space-y-3">
+            <div>
+                <label>Nome do Insumo</label>
+                <input type="text" id="ins-name" value="${insumo?.name || ''}" placeholder="Ex: Tecido Algodão">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label>Unidade</label>
+                    <select id="ins-unit">
+                        <option value="un" ${insumo?.unit === 'un' ? 'selected' : ''}>Unidade (un)</option>
+						<option value="fl" ${insumo?.unit === 'fl' ? 'selected' : ''}>folha (fl)</option>
+                        <option value="m" ${insumo?.unit === 'm' ? 'selected' : ''}>Metro (m)</option>
+                        <option value="kg" ${insumo?.unit === 'kg' ? 'selected' : ''}>Quilo (kg)</option>
+                        <option value="cm" ${insumo?.unit === 'cm' ? 'selected' : ''}>Centímetro (cm)</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Preço Unitário (R$)</label>
+                    <input type="number" id="ins-price" step="0.01" value="${insumo?.unitPrice|| ''}">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label>Estoque Atual</label>
+                    <input type="number" id="ins-stock" step="0.01" value="${insumo?.stock || '0'}">
+                </div>
+                <div>
+                    <label>Estoque Mínimo</label>
+                    <input type="number" id="ins-min" step="0.01" value="${insumo?.minStock || '0'}">
+                </div>
+				<div class="mb-4">
+					<label class="block text-xs font-bold text-slate-500 mb-1">DATA DA COMPRA</label>
+					<input type="date" id="ins-date" class="w-full p-3 bg-slate-100 rounded-xl border-none text-sm">
+				</div>
+            </div>
+			
+            <div class="grid grid-cols-2 gap-2 mt-4">
+                <button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold">CANCELAR</button>
+                <button onclick="saveInsumo('${id || ''}')" class="bg-blue-600 text-white py-3 rounded-xl font-bold">SALVAR</button>
+            </div>
+        </div>
+    `);
+}		
+			// 1. Função para desenhar a lista (CORRIGIDA)
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function openProductModal(id = null) {
+			 const p = id ? state.produtos.find(x => x.id === id) : null;
+			 
+			 // Inicializa a composição temporária
+			 tempComp = (p && p.composition) ? JSON.parse(JSON.stringify(p.composition)) : [];
+			 
+			 const bdi = p?.bdi !== undefined ? p.bdi : 100;
+			 const round = p?.rounding !== undefined ? p.rounding : 0;
+			
+			 showModal(`
+			     <h3 class="font-bold mb-4 text-slate-800 border-b pb-2">${id ? 'Editar' : 'Novo'} Produto</h3>
+			     <label>Nome do Produto</label>
+			     <input type="text" id="prod-name" value="${p?.name || ''}">
+			     
+			     <div class="grid grid-cols-2 gap-2">
+			         <div>
+			             <label>BDI (%)</label>
+			             <input type="number" id="prod-bdi" value="${bdi}" oninput="renderCompUI()">
+			<button onclick="openCalc('prod-bdi', 'BDI')">🧮</button>
+			         </div>
+			<div>
+			<label>Arredondamento ()</label>
+			<input type="number" id="prod-round" value="${round}" step="0.01" oninput="renderCompUI()">
+			<button onclick="openCalc('prod-round', 'Arredondamento')">🧮</button>
+			</div>
+			     </div>
+			<div class="grid grid-cols-2 gap-4 mb-4">
+			 <div class="p-3 bg-slate-100 rounded-xl">
+			     <label class="block text-[10px] uppercase tracking-wide text-blue-600 font-bold">Custo Base</label>
+			     <span id="prod-cost-display" class="text-lg font-bold text-slate-700"> 0,00</span>
+			 </div>
+			 <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
+			     <label class="block text-[10px] uppercase tracking-wide text-blue-600 font-bold">Preço Final</label>
+			     <input type="text" id="prod-price" readonly class="bg-transparent border-none p-0 m-0 text-lg font-bold text-blue-700 w-full focus:ring-0">
+			 </div>
+			</div>      
+			
+			<div class=" bg-blue-50 border border-blue-100">
+				<table>
+					<tr>
+						<td >
+							<select id="comp-insumo-select" class="flex-1">
+							<option value="">Selecione o insumo...</option>
+							${state.insumos
+							.sort((a, b) => a.name.localeCompare(b.name))
+							.map(i => `<option value="${i.id}">${i.name}</option>`)
+							.join('')}
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<td>
+						<div class="grid grid-cols-2 gap-3 mt-4">
+							<input type="number" id="comp-insumo-qty" step="0.01"   Qtd" class="w-24">
+							<button onclick="openCalc('comp-insumo-qty', 'Quant')">🧮</button>
+							<button onclick="addInsumoToProd()" class="bg-blue-600 text-white px-4 rounded-lg font-bold">Inserir</button>
+						
+						</div>
+						</td>
+					</tr>
+				</table>
+			</div>
+			<div class="flex gap-2 mb-3">  
+			     <div id="comp-list-ui" class="space-y-2 max-h-48 overflow-y-auto border p-2 rounded bg-slate-50"></div>
+			 </div>
+			
+			<div class="grid grid-cols-2 gap-3 mt-6">
+				<button onclick="closeModal()" class="bg-slate-300 py-3 rounded-lg font-bold">CANCELAR</button>
+				<button onclick="saveProduct('${id || ''}')" class="bg-blue-600 text-white py-3 rounded-lg font-bold">SALVAR</button>
+			</div>
+			 `);
+			
+			 // FORÇA A RENDERIZAÇÃO DA LISTA IMEDIATAMENTE APÓS CRIAR O MODAL
+			 renderCompUI(); 
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function addInsumoToProd() {
+			const select = document.getElementById('comp-insumo-select');
+			const qtyInput = document.getElementById('comp-insumo-qty');
+			
+			if (!select || !qtyInput) {
+			alert("Erro interno: campo de quantidade não encontrado.");
+			return;
+			}
+			
+			const insumoId = select.value;
+			const qty = parseFloat(qtyInput.value);
+			
+			if (!insumoId) {
+			alert("Selecione um insumo");
+			return;
+			}
+			
+			if (isNaN(qty) || qty === 0) {
+			alert("Informe uma quantidade válida");
+			return;
+			}
+			
+			const insumo = state.insumos.find(i => i.id === insumoId);
+			if (!insumo) {
+			alert("Insumo inválido");
+			return;
+			}
+			
+			const existente = tempComp.find(item => item.id === insumoId);
+			
+			if (existente) {
+			existente.qty += qty;
+			} else {
+			tempComp.push({
+			   id: insumo.id,
+			   name: insumo.name,
+			   unitPrice: parseFloat(insumo.unitPrice || 0),
+			   qty: qty
+			});
+			}
+			
+			qtyInput.value = "";
+			renderCompUI();
+			}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++	
+	// Função para atualizar todos os produtos que utilizam um insumo específico
+async function updateLinkedProducts(insumoId) {
+    if (!state.produtos) return;
+
+    const produtosAfetados = state.produtos.filter(p => 
+        p.composition && Array.isArray(p.composition) && p.composition.some(c => c.id === insumoId)
+    );
+
+    for (const produto of produtosAfetados) {
+        let novoCustoTotal = 0;
+
+        produto.composition.forEach(comp => {
+            const insumoInfo = state.insumos.find(i => i.id === comp.id);
+            
+            // CORREÇÃO AQUI: Forçar conversão para número e usar 0 se for inválido
+            const precoUnit = insumoInfo ? parseFloat(insumoInfo.price) : 0;
+            const qtd = parseFloat(comp.qty);
+
+            // Verifica se os valores são números válidos antes de somar
+            if (!isNaN(precoUnit) && !isNaN(qtd)) {
+                novoCustoTotal += qtd * precoUnit;
+            }
+        });
+
+        // Garantia final: Se por algum motivo o total ainda for NaN, define como 0
+        if (isNaN(novoCustoTotal)) novoCustoTotal = 0;
+
+        try {
+            // Arredonda para 2 casas decimais para evitar dízimas no banco
+            const valorFinal = parseFloat(novoCustoTotal.toFixed(2));
+
+            await db.ref('produtos/' + produto.id).update({
+                basePrice: valorFinal,
+                price: valorFinal // Ajuste se houver margem de lucro
+            });
+        } catch (e) {
+            console.error("Erro ao atualizar produto: " + produto.name, e);
+        }
+    }
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function confirmCalcInsumo(insumoId) {
+			 const display = document.getElementById('calc-display');
+			 const insumo = state.insumos.find(i => i.id === insumoId);
+			 
+			 try {
+			     let valorCalculado = eval(display.value) || 0;
+			     let finalQty = parseFloat((Math.round(valorCalculado * 100) / 100).toFixed(2));
+			
+			     if (finalQty > 0) {
+			         if (!tempComp) tempComp = [];
+			         const existing = tempComp.find(item => item.id === insumoId);
+			         
+			         if (existing) {
+			             existing.qty += finalQty;
+			         } else {
+			  tempComp.push({
+			insumoId: insumo.id,
+			insumoName: insumo.name,
+			qty: qty,
+			unitPrice: insumo.unitPrice
+			});
+			         }
+			         closeCalc();
+			         renderCompUI();
+			     } else {
+			         alert("Quantidade inválida");
+			     }
+			 } catch (e) {
+			     alert("Erro no cálculo");
+			 }
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function confirmCalcInsumo(insumoId) {
+			 const display = document.getElementById('calc-display');
+			 const insumo = state.insumos.find(i => i.id === insumoId);
+			 
+			 try {
+			     let valorCalculado = eval(display.value) || 0;
+			     let finalQty = parseFloat((Math.round(valorCalculado * 100) / 100).toFixed(2));
+			
+			     if (finalQty > 0) {
+			         if (!tempComp) tempComp = [];
+			         const existing = tempComp.find(item => item.id === insumoId);
+			         
+			         if (existing) {
+			             existing.qty += finalQty;
+			         } else {
+			             tempComp.push({ 
+			                 id: insumo.id, 
+			                 name: insumo.name, 
+			                 unitPrice: parseFloat(insumo.unitPrice || 0), 
+			                 qty: finalQty 
+			             });
+			         }
+			         closeCalc();
+			         renderCompUI();
+			     } else {
+			         alert("Quantidade inválida");
+			     }
+			 } catch (e) {
+			     alert("Erro no cálculo");
+			 }
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function renderCompUI() {
+			 const list = document.getElementById('comp-list-ui');
+			 let totalCustoBase = 0;
+			
+			 list.innerHTML = tempComp.map((item, index) => {
+			     // Truncar o valor unitário para 2 casas decimais antes do cálculo
+			     const unitPriceTrunc = Math.round(item.unitPrice * 100) / 100;
+			     const totalItem = item.qty * unitPriceTrunc;
+			     totalCustoBase += totalItem;
+			
+			     return `
+			     
+			         <div class="text-[12px] flex justify-between items-start">
+						 <table style="width: 100%; table-layout: fixed;">
+							  <tr>
+								<td style="width: 15%; text-align: right;"><b class="text-blue-600">${item.qty} &nbsp &nbsp </b></td>
+								<td style="width: 50%; text-align: left;"><b class="text-blue-600 desc-cell">${item.name}</b></td>
+								<td style="width: 15%; text-align: right;"><b class="text-blue-600">${unitPriceTrunc.toFixed(2)}</b></td>
+								<td style="width: 20%; text-align: right;"><b class="text-blue-600">${totalItem.toFixed(2)}
+										<button onclick="tempComp.splice(${index}, 1); renderCompUI();" class="ml-2 text-red-400 hover:text-red-600">
+										<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+										</button>
+								</b></td>
+							  </tr>
+						</table>
+			         
+			     </div>`;
+			 }).join('');
+			
+			 // --- CÁLCULOS FINAIS ---
+			
+			 // 1. Exibir Custo Base
+			 const costDisplay = document.getElementById('prod-cost-display');
+			 if (costDisplay) costDisplay.innerText = ` ${totalCustoBase.toFixed(2)}`;
+			
+			 // 2. Parâmetros
+			 const bdi = (parseFloat(document.getElementById('prod-bdi').value) || 0) / 100;
+			 const roundValue = parseFloat(document.getElementById('prod-round').value) || 0;
+			
+			 // 3. Fórmula: ((1 + BDI) * Custo) truncado + Arredondamento
+			 let valorComBDI = totalCustoBase * (1 + bdi);
+			 let valorTruncado = Math.round(valorComBDI * 100) / 100;
+			 let precoFinal = valorTruncado + roundValue;
+			
+			 // 4. Atualizar Preço Final
+			 document.getElementById('prod-price').value = ` ${precoFinal.toFixed(2)}`;
+			}
+			// Função auxiliar para garantir que o item seja removido do array e da tela
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function removerItemComposicao(idx) {
+			 tempComp.splice(idx, 1);
+			 renderCompUI();
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			async function saveProduct(id = null) {
+			
+			const finalId = (id && id !== 'null' && id !== '') ? id : db.ref().child('produtos').push().key;
+			const name = document.getElementById('prod-name').value.trim();
+			const bdi = parseFloat(document.getElementById('prod-bdi').value) || 0;
+			const rounding = parseFloat(document.getElementById('prod-round').value) || 0;
+			
+			// Captura o preço final limpando a máscara 
+			const priceStr = document.getElementById('prod-price').value.replace('', '').replace(/\s/g, '').replace(',', '.');
+			const finalPrice = parseFloat(priceStr) || 0;
+			
+			if (!name) return alert("Insira o nome do produto!");
+			
+			// CRUCIAL: Se não houver id, gera um NOVO. Se houver, usa o existente para editar.
+			
+			const productData = {
+			id: finalId,
+			name: name,
+			bdi: bdi,
+			rounding: rounding,
+			finalPrice: finalPrice,
+			composition: tempComp, 
+			basePrice: tempComp.reduce((acc, item) => acc + (item.qty * (item.unitPrice || 0)), 0)
+			};
+			
+			try {
+			await db.ref('produtos/' + finalId).set(productData);
+			alert(id ? "Produto atualizado!" : "Novo produto criado com sucesso!");
+			closeModal();
+			} catch (e) {
+			alert("Erro ao guardar: " + e.message);
+			}
+			}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function showPage(pageId) {
+    // 1. Esconde todas as páginas e remove o estado ativo de todos os itens da nav
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+
+    // 2. Mostra a página solicitada
+    const targetPage = document.getElementById('page-' + pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+    }
+
+    // 3. Destaca o botão correto na barra de navegação
+    // Procuramos o botão que tem a função onclick correspondente à página
+    const navButtons = document.querySelectorAll('.nav-item');
+    navButtons.forEach(btn => {
+        if (btn.getAttribute('onclick').includes(`'${pageId}'`)) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Se a página for a de orçamentos salvos, renderiza a lista
+    if (pageId === 'saved') {
+        renderBudgetItems();
+        renderInsumosSummary();
+    }
+}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function closeModal() {
+			const overlay = document.getElementById('modal-overlay');
+			const container = document.getElementById('modal-content');
+			
+			if (overlay) {
+			overlay.classList.add('hidden'); // Esconde a calculadora/modal
+			}
+			if (container) {
+			container.innerHTML = ''; // Limpa o conteúdo para não pesar na memória
+			}
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function showModal(content) {
+			const overlay = document.getElementById('modal-overlay');
+			const container = document.getElementById('modal-content');
+			if (overlay && container) {
+			container.innerHTML = content;
+			overlay.classList.remove('hidden');
+			}
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			function renderList(id, data, template) { document.getElementById(id).innerHTML = data.map(template).join(''); }
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+	function getDataAtualISO() { return new Date().toISOString().split('T')[0];
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			// 1. Limpa o formulário para um novo orçamento
+function clearBudgetForm() {
+    // 1. Limpa o ID de edição para que o sistema saiba que é um NOVO orçamento
+    state.editingBudgetId = null;
+
+    // 2. Reseta o formulário para os valores padrão
+    document.getElementById('budget-client').value = "";
+    document.getElementById('budget-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('budget-delivery-date').value = "";
+    document.getElementById('budget-extra').value = "0";
+    document.getElementById('budget-discount').value = "0";
+    document.getElementById('budget-obs').value = "";
+
+    // 3. Limpa a lista de produtos adicionados
+    currentItems = [];
+    
+    // 4. Atualiza a interface visual
+    renderBudgetItems(); 
+    calcBudgetTotal();
+
+    // 5. Esconde as seções que só devem aparecer na edição (Pagamentos e Ações)
+   // document.getElementById('payment-section').classList.add('hidden');
+  //document.getElementById('budget-actions').classList.add('hidden');
+
+   
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+function addItemToBudget() {
+    const productId = document.getElementById('budget-product-select').value;
+    const p = state.produtos.find(x => x.id === productId);
+    if (!p) return;
+	let valorCusto = p.basePrice || 0;
+        
+        if (valorCusto === 0 && p.composition) {
+            valorCusto = p.composition.reduce((acc, item) => acc + (item.qty * (item.unitPrice || 0)), 0);
+        }
+
+    showModal(`
+        <h3 class="font-bold mb-4">Adicionar ${p.name}</h3>
+		 
+				<div class="bg-blue-400 p-4 rounded-xl  text-black mt-4 shadow-inner">
+					<p class="text-[16px] font-bold">Valor  : R$ ${p.finalPrice.toFixed(2)}</p>
+					<p class="text-[16px] font-bold">Custo : RS ${valorCusto.toFixed(2)}</p>					
+				</div>
+
+        
+        <label>Quantidade</label>
+        <input type="number" id="modal-qty" value="1" step="0.01" class="mb-4">
+		
+        <label class="text-red-600">Desconto por Unidade (R$)</label>
+        <input type="number" id="modal-item-discount" value="0" step="0.01" class="mb-4 border-red-200" placeholder="0.00">
+		
+		
+        
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold">CANCELAR</button>
+            <button onclick="confirmAddItem('${p.id}', '${p.name}')" class="btn-primary">ADICIONAR</button>
+        </div>
+    `);
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function updateModalQty(val) {
+    const input = document.getElementById('modal-qty');
+    let current = parseInt(input.value) || 0;
+    if (current + val >= 1) {
+        input.value = current + val;
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function confirmAddItem(id, name) {
+    const qty = parseFloat(document.getElementById('modal-qty').value);
+    //const originalPrice = parseFloat(document.getElementById('modal-price').value);
+    const discount = parseFloat(document.getElementById('modal-item-discount').value || 0);
+    const p = state.produtos.find(x => x.id === id);
+    // Calcula o preço líquido (original menos o desconto)
+    const finalPrice = p.finalPrice - discount;
+
+    if (qty > 0) {
+        currentItems.push({
+            productId: id,
+            name: name,
+            qty: qty,
+            price: finalPrice, // Este é o preço que será usado no total
+            originalPrice: p.finalPrice,
+            itemDiscount: discount
+        });
+        
+        renderBudgetItems(); // Atualiza a lista visual
+        closeModal();        // Fecha o modal
+    } else {
+        alert("A quantidade deve ser maior que zero.");
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function confirmAddProduct(productId) {
+    const qty = parseInt(document.getElementById('modal-qty').value);
+    const produto = state.produtos.find(p => p.id === productId);
+
+    if (qty > 0 && produto) {
+        // Verifica se o produto já está no carrinho do orçamento atual
+        const existingItem = budgetItems.find(item => item.id === productId);
+        
+        if (existingItem) {
+            existingItem.qty += qty;
+            existingItem.total = existingItem.qty * existingItem.price;
+        } else {
+            budgetItems.push({
+                id: produto.id,
+                name: produto.name,
+                price: produto.price,
+                qty: qty,
+                total: produto.price * qty
+            });
+        }
+        
+        closeModal();
+        renderBudgetItems(); // Atualiza a tabelinha de itens do orçamento
+        calculateBudgetTotal(); // Recalcula o total geral
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function applyQtyAdjust(productId) {
+    const input = document.getElementById('qty-adjust-input');
+    if (!input) return;
+
+    const delta = parseFloat(input.value);
+    if (isNaN(delta) || delta === 0) {
+        alert("Informe um valor diferente de zero.");
+        return;
+    }
+
+    const item = currentItems.find(i => i.productId === productId);
+    if (!item) return;
+
+    item.qty += delta;
+
+    // ❌ Remove se zerar ou ficar negativo
+    if (item.qty <= 0) {
+        currentItems = currentItems.filter(i => i.productId !== productId);
+    }
+
+    closeModal();
+    renderBudgetItems();
+    calcBudgetTotal();
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function openQtyAdjustModal(item) {
+    showModal(`
+        <h3 class="font-bold text-lg mb-3">Ajustar Quantidade</h3>
+
+        <p class="text-sm mb-2">
+            Produto: <b>${item.productName}</b>
+        </p>
+
+        <p class="text-xs text-slate-500 mb-4">
+            Quantidade atual: <b>${item.qty}</b>
+        </p>
+
+        <label class="text-xs font-bold uppercase">Ajuste de Quantidade</label>
+        <input 
+            type="number"
+            id="qty-adjust-input"
+            step="1"
+            value="1"
+            class="w-full p-2 border rounded-lg"
+        >
+
+        <p class="text-[11px] text-slate-400 mt-1">
+            Use valores positivos para acrescentar e negativos para reduzir.
+        </p>
+
+        <div class="grid grid-cols-2 gap-3 mt-6">
+            <button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold">
+                Cancelar
+            </button>
+            <button onclick="applyQtyAdjust('${item.productId}')" class="bg-blue-600 text-white py-3 rounded-xl font-bold">
+                Aplicar
+            </button>
+        </div>
+    `);
+}
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+			function openCalc(fieldId, title) {
+			targetFieldId = fieldId;
+			document.getElementById('calc-title').innerText = title;
+			document.getElementById('calc-display').value = "0";
+			currentInput = "";
+			document.getElementById('calc-modal').classList.remove('hidden');
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function calculateResult() {
+			const display = document.getElementById('calc-display');
+			if (!display || !display.value) return;
+			
+			try {
+			// Substitui a vírgula por ponto para o JavaScript entender o decimal
+			let expressao = display.value.replace(/,/g, '.');
+			
+			// Realiza o cálculo matemático da string
+			let resultado = eval(expressao);
+			
+			// Formata o resultado para 2 casas decimais e volta para o visor
+			display.value = Number.isInteger(resultado) ? resultado : resultado.toFixed(2);
+			} catch (e) {
+			display.value = "Erro";
+			setTimeout(() => { display.value = "0"; }, 1000);
+			}
+			}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function toggleSign() {
+			const display = document.getElementById('calc-display');
+			if (display.value.startsWith('-')) {
+			display.value = display.value.substring(1);
+			} else if (display.value !== '0') {
+			display.value = '-' + display.value;
+			}
+			}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function transferCalcValue() {
+			const display = document.getElementById('calc-display');
+			if (!display) return;
+			
+			const val = parseFloat(display.value) || 0;
+			
+			// 1. Transfere o valor para o campo que solicitou a calculadora
+			if (currentCalcTarget) {
+			const input = document.getElementById(currentCalcTarget);
+			if (input) {
+			   input.value = val.toFixed(2);
+			   // 2. Dispara o evento de input para que os cálculos automáticos da página ocorram
+			   input.dispatchEvent(new Event('input'));
+			}
+			}
+			
+			// 3. FECHA APENAS A CALCULADORA (Esconde o modal)
+			closeModal(); 
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function closeCalc() {
+			 document.getElementById('calc-modal').classList.add('hidden');
+			}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			       
+			function confirmCalc(productId) {
+			 const display = document.getElementById('calc-display');
+			 const p = state.produtos.find(x => x.id === productId);
+			 
+			 try {
+			     // Resolve o cálculo
+			     let valorCalculado = eval(display.value) || 0;
+			     
+			     // Arredonda e trunca com 2 casas decimais
+			     let finalQty = parseFloat((Math.round(valorCalculado * 100) / 100).toFixed(2));
+			
+			     if (finalQty > 0) {
+			         currentItems.push({
+			             id: p.id,
+			             name: p.name,
+			             price: parseFloat(p.finalPrice),
+			             qty: finalQty,
+			             total: parseFloat(p.finalPrice) * finalQty
+			         });
+			         
+			         closeCalc();
+			         renderBudgetItems();
+			     } else {
+			         alert("Quantidade inválida");
+			     }
+			 } catch (e) {
+			     alert("Erro no cálculo");
+			 }
+			}
+			// Gerencia os cliques nos botões da calculadora
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function pressCalc(value) {
+			const display = document.getElementById('calc-display');
+			if (value === 'C') {
+			currentInput = "";
+			display.value = "0";
+			} else {
+			currentInput += value;
+			display.value = currentInput;
+			}
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			// Função para o botão "SAIR (=)" - Resolve a conta e fecha o modal
+			function solveCalc() {
+			const display = document.getElementById('calc-display');
+			try {
+			if (currentInput === "") return;
+			const result = eval(currentInput);
+			currentInput = result.toString();
+			display.value = currentInput;
+			} catch (e) {
+			display.value = "Erro";
+			currentInput = "";
+			}
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function transferValue() {
+			const finalValue = document.getElementById('calc-display').value;
+			const targetField = document.getElementById(targetFieldId);
+			
+			if (targetField) {
+			targetField.value = finalValue;
+			// Dispara evento de mudança caso existam cálculos automáticos na página
+			targetField.dispatchEvent(new Event('input'));
+			targetField.dispatchEvent(new Event('change'));
+			}
+			closeCalc();
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function closeCalc() {
+			document.getElementById('calc-modal').classList.add('hidden');
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			// Função para o botão "TRANSFERIR" - Envia o valor para o campo que chamou
+			function transferToInput() {
+			const display = document.getElementById('calc-display');
+			let result;
+			try {
+			result = eval(display.value);
+			} catch {
+			alert("Conta inválida");
+			return;
+			}
+			
+			if (currentCalcTarget && document.getElementById(currentCalcTarget)) {
+			const input = document.getElementById(currentCalcTarget);
+			input.value = result;
+			
+			// Dispara evento de input para atualizar cálculos automáticos (como o total do orçamento)
+			input.dispatchEvent(new Event('input'));
+			}
+			closeModal();
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function confirmCalc(productId) {
+			 const display = document.getElementById('calc-display');
+			 const p = state.produtos.find(x => x.id === productId);
+			 
+			 try {
+			     // 1. Resolve a expressão (ex: 10 + 5.5)
+			     let rawValue = eval(display.value) || 0;
+			     
+			     // 2. Arredonda e trunca para 2 casas decimais
+			     // Multiplica por 100, arredonda, divide por 100 e fixa em 2 casas
+			     let finalQty = parseFloat((Math.round(rawValue * 100) / 100).toFixed(2));
+			
+			     if (finalQty > 0) {
+			         currentItems.push({
+			             id: p.id,
+			             name: p.name,
+			             price: parseFloat(p.finalPrice),
+			             qty: finalQty,
+			             total: parseFloat(p.finalPrice) * finalQty
+			         });
+			         
+			         closeModal();
+			         renderBudgetItems();
+			     } else {
+			         alert("A quantidade calculada deve ser maior que zero.");
+			     }
+			 } catch (e) {
+			     alert("Erro no cálculo. Verifique os números e sinais.");
+			 }
+			}
+			
+			// 3. Renderiza a lista e calcula o total
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function renderBudgetItems() {
+    const list = document.getElementById('budget-items-list');
+    if (!list) return;
+
+    list.innerHTML = currentItems.map((item, index) => {
+        // Garantir que os valores são numéricos
+        const qty = parseFloat(item.qty || 0);
+        const originalPrice = parseFloat(item.originalPrice || item.price || 0);
+        const itemDiscount = parseFloat(item.itemDiscount || 0);
+        
+        // O preço exibido já deve ser o líquido (Original - Desconto)
+        const priceWithDiscount = originalPrice - itemDiscount;
+        const totalItem = qty * priceWithDiscount;
+
+        return `
+            <div class="flex justify-between items-center bg-white p-3 rounded-lg border mb-2 shadow-sm border-l-4 border-blue-500">
+                <div class="flex-1">
+                    <div class="font-bold text-slate-800 text-sm uppercase">${item.name}</div>
+                    <div class="text-xs text-slate-500 mt-1">
+                        ${qty} x R$ ${originalPrice.toFixed(2)} 
+                        ${itemDiscount > 0 ? `<span class="text-red-500 font-bold ml-1">(-R$ ${itemDiscount.toFixed(2)})</span>` : ''}
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 text-right">
+                    <div>
+                        <div class="text-[10px] text-slate-400 uppercase font-bold">Total Item</div>
+                        <div class="font-black text-blue-700">R$ ${totalItem.toFixed(2)}</div>
+                    </div>
+                    <button onclick="removeItemFromBudget(${index})" class="text-red-400 hover:text-red-600 px-2 font-bold text-lg">✕</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Atualiza o total geral do orçamento no rodapé
+    if (typeof calcBudgetTotal === 'function') {
+        calcBudgetTotal();
+    }
+}
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function removeItemFromBudget(index) {
+    if (confirm("Deseja remover este item do orçamento?")) {
+        // Remove 1 item na posição do index clicado
+        currentItems.splice(index, 1);
+        
+        // Atualiza a lista na tela e recalcula o total
+        renderBudgetItems();
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function changeItemQty(index, delta) {
+    budgetItems[index].qty += delta;
+    
+    if (budgetItems[index].qty <= 0) {
+        budgetItems.splice(index, 1); // Remove se chegar a zero
+    } else {
+        budgetItems[index].total = budgetItems[index].qty * budgetItems[index].price;
+    }
+    
+    renderBudgetItems();
+    calculateBudgetTotal();
+}
+
+// Função para atualizar todos os produtos que usam um determinado insumo
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+async function updateProductsLinkedToInsumo(insumoId) {
+    // 1. Localiza o insumo atualizado para obter o novo preço
+    const insumo = state.insumos.find(i => i.id === insumoId);
+    if (!insumo) return;
+
+    // 2. Filtra produtos que contêm este insumo na composição
+    const produtosAfetados = state.produtos.filter(p => 
+        p.composition && p.composition.some(item => item.id === insumoId)
+    );
+
+    for (const produto of produtosAfetados) {
+        let novoCusto = 0;
+
+        // 3. Recalcula o custo total baseado nos preços atuais de TODOS os insumos da composição
+        produto.composition.forEach(item => {
+            const insData = state.insumos.find(i => i.id === item.id);
+            const precoUnitario = insData ? parseFloat(insData.price) : 0;
+            novoCusto += parseFloat(item.qty) * precoUnitario;
+        });
+
+        // 4. Se você usa uma margem de lucro fixa, pode aplicar aqui. 
+        // Caso contrário, atualizamos apenas o preço de custo base.
+        try {
+            await db.ref('produtos/' + produto.id).update({
+                basePrice: novoCusto,
+                price: novoCusto // Ou (novoCusto * margem) se tiver margem definida
+            });
+        } catch (e) {
+            console.error("Erro ao atualizar produto " + produto.name, e);
+        }
+    }
+}
+
+// Funções de suporte para atualização
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+function updateItemQty(index, val) {
+			currentItems[index].qty = parseFloat(val) || 0;
+			calcBudgetTotal();
+			}
+			
+			// 4. Cálculo do Total com Acréscimos/Descontos
+			
+			if (state.editingBudgetId) {
+			 const b = state.orcamentos.find(o => o.id === state.editingBudgetId);
+			 if (b) {
+			     const pago = parseFloat(b.paid) || 0;
+			     const total = parseFloat(document.getElementById('total-display').innerText) || 0;
+			     
+			     document.getElementById('paid-display').innerText = ` ${pago.toFixed(2)}`;
+			     document.getElementById('debt-display').innerText = ` ${(total - pago).toFixed(2)}`;
+			
+			     // EXIBIR HISTÓRICO DE PAGAMENTOS
+			     let htmlHistorico = '<h4 class="text-[10px] font-bold uppercase mt-3 mb-1 text-blue-600">Histórico de Parcelas:</h4>';
+			     if (b.paymentsHistory && b.paymentsHistory.length > 0) {
+			         b.paymentsHistory.forEach(p => {
+			             htmlHistorico += `
+			                 <div class="flex justify-between text-[11px] bg-white border-b py-1">
+			                     <span>Pago em ${p.data} (${p.metodo})</span>
+			                     <span class="font-bold text-green-700"> ${p.valor.toFixed(2)}</span>
+			                 </div>`;
+			         });
+			     } else {
+			         htmlHistorico += '<div class="text-[11px] italic">Nenhum pagamento registrado.</div>';
+			     }
+			     
+			     // Adicione um div com id="history-list" no seu HTML para receber isso
+			     const historyContainer = document.getElementById('history-list');
+			     if(historyContainer) historyContainer.innerHTML = htmlHistorico;
+			 }
+			}	
+			
+			// 5. Função SALVAR Corrigida
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function updateAccounting(id) {
+    const data = {
+        id: id,
+        date: document.getElementById('edit-acc-date').value,
+        description: document.getElementById('edit-acc-desc').value,
+        type: document.getElementById('edit-acc-type').value,
+        value: parseFloat(document.getElementById('edit-acc-val').value)
+    };
+
+    if (!data.description || isNaN(data.value)) {
+        return alert("Preencha todos os campos corretamente!");
+    }
+
+    try {
+        await db.ref('contabilidade/' + id).set(data);
+        closeModal();
+        alert("Lançamento atualizado com sucesso!");c
+    } catch (e) {
+        alert("Erro ao atualizar: " + e.message);
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function newBudget() {
+    state.currentBudget = {
+        id: crypto.randomUUID(),
+        number: getNextBudgetNumber(),
+        clientId: '',
+        clientName: '',
+        items: [],
+        total: 0,
+        date: new Date().toISOString().split('T')[0],
+        obs: ''
+    };
+	}
+
+  
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+async function saveBudget() {
+    const clientId = document.getElementById('budget-client').value;
+    const clientName = state.clientes.find(c => c.id === clientId)?.name || "Cliente";
+    const date = document.getElementById('budget-date').value;
+	
+    const deliveryDate = document.getElementById('budget-delivery-date').value;
+    if (!deliveryDate) {
+        alert("Por favor, informe a DATA DE ENTREGA antes de salvar o orçamento.");
+        document.getElementById('budget-delivery-date').focus(); // Foca no campo para facilitar
+        return; // Interrompe a execução da função não salva no Firebase
+    }
+	
+    if (!clientId || currentItems.length === 0) {
+        alert("Selecione um cliente e adicione pelo menos um produto!");
+        return;
+    }
+
+    // Se estiver editando, usa o ID existente. Se for novo, gera um novo.
+    const finalId = state.editingBudgetId || db.ref().child('orcamentos').push().key;
+	let budgetNumber;
+    if (state.editingBudgetId) {
+        // Se for edição, mantém o número que já estava no banco
+        const original = state.orcamentos.find(x => x.id === state.editingBudgetId);
+        budgetNumber = original ? original.number : getNextBudgetNumber();
+    } else {
+        // Se for novo, gera o próximo número sequencial
+        budgetNumber = getNextBudgetNumber();
+    }
+    const data = {
+        id: finalId,
+		number: budgetNumber, 
+        clientId: clientId,
+        clientName: clientName,
+        date: date,
+		deliveryDate: document.getElementById('budget-delivery-date').value,
+        items: currentItems,
+        extraValue: parseFloat(document.getElementById('budget-extra').value || 0),
+        discountValue: parseFloat(document.getElementById('budget-discount').value || 0),
+        total: calcBudgetTotal(),
+        obs: document.getElementById('budget-obs').value,
+        status: "Aberto",
+        paid: 0
+    };
+
+    try {
+        await db.ref('orcamentos/' + finalId).set(data);
+        alert("Orçamento salvo com sucesso!");
+        clearBudgetForm(); // Limpa a tela para o próximo
+        showPage('saved'); // Vai para a lista de salvos
+    } catch (e) {
+        alert("Erro ao salvar3: " + e.message);
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function getNextBudgetNumber() {
+    if (!state.orcamentos || state.orcamentos.length === 0) {
+        return 1;
+    }
+    return Math.max(...state.orcamentos.map(o => o.number)) + 1;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+function newBudget() {
+    state.currentBudget = {
+        id: crypto.randomUUID(),
+        number: getNextBudgetNumber(),
+        clientId: '',
+        clientName: '',
+        items: [],
+        total: 0,
+        date: new Date().toISOString().split('T')[0],
+        obs: ''
+    };}
+
+	
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function abrirPagamentoEdicao() {
+			if(!state.editingBudgetId) return;
+			openPaymentModal(state.editingBudgetId); // Reutiliza o modal de pagamento já existente
+			}
+			let tempBudItems = [];
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function openNewBudgetModal() {
+			tempBudItems = [];
+			showModal(`
+			     <h3 class="font-bold mb-4">Novo Orçamento</h3>
+			     <label>Cliente</label>
+			     <select id="budget-client">
+			         <option value="">Selecione...</option>
+			         ${state.clientes.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+			</select>
+			
+			     
+			
+			     <div id="bud-items-list" class="space-y-2 mb-4 border-y py-2 min-h-[40px]"></div>
+			
+			     <div class="grid grid-cols-2 gap-2">
+			<div>
+			<label>Acréscimos ()</label>
+			<div class="flex gap-1">		
+			   <input type="number" id="budget-extra" value="0" step="0.01" oninput="calcBudgetTotal()" class="mb-0">
+			   <button onclick="openCalc('budget-extra', 'Acréscimo')">🧮</button>
+			
+			</div>
+			</div>
+			<div>
+			<label>Descontos ()</label>
+			<div class="flex gap-1">
+			   <input type="number" id="budget-discount" value="0" step="0.01" oninput="calcBudgetTotal()" class="mb-0">
+			<button onclick="openCalc('budget-discount', 'Desconto')">🧮</button>        </div>
+			</div>
+			</div>
+			
+			     <div class="bg-blue-600 p-4 rounded-xl text-center text-white mt-4 shadow-inner">
+			         <p class="text-[10px] uppercase opacity-70 font-bold">Total do Orçamento</p>
+			         <h2 class="text-2xl font-black" id="bud-total-display"> 0,00</h2>
+					 </div>
+					 
+			
+			
+			`);
+			}
+			
+			
+			     init();
+			// FUNÇÃO PARA EXCLUIR LANÇAMENTO
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function deleteAccounting(id) {
+    if (!id || id === 'undefined') return alert("Erro: ID não encontrado.");
+    
+    if (confirm("Deseja realmente excluir este lançamento contábil?")) {
+        try {
+            await db.ref('contabilidade/' + id).remove();
+            alert("Lançamento removido com sucesso!");
+        } catch (e) {
+            alert("Erro ao excluir: " + e.message);
+        }
+    }
+}
+			
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			// FUNÇÃO PARA ABRIR O MODAL DE EDIÇÃO
+function editAccounting(id) {
+    const item = state.contabilidade.find(x => x.id === id);
+    if (!item) return;
+
+    showModal(`
+        <h3 class="font-bold mb-4 text-blue-600">Editar Lançamento</h3>
+        <label>Data</label>
+        <input type="date" id="edit-acc-date" value="${item.date}">
+        
+        <label>Descrição</label>
+        <input type="text" id="edit-acc-desc" value="${item.description}">
+        
+        <label>Tipo</label>
+        <select id="edit-acc-type">
+            <option value="Receita" ${item.type === 'Receita' ? 'selected' : ''}>Entrada (Receita)</option>
+            <option value="Despesa" ${item.type === 'Despesa' ? 'selected' : ''}>Saída (Despesa)</option>
+        </select>
+        
+        <label>Valor (R$)</label>
+        <input type="number" id="edit-acc-val" step="0.01" value="${item.value}">
+        
+        <div class="grid grid-cols-2 gap-2 mt-4">
+            <button onclick="closeModal()" class="bg-slate-200 p-3 rounded-xl font-bold">CANCELAR</button>
+            <button onclick="updateAccounting('${id}')" class="bg-blue-600 text-white p-3 rounded-xl font-bold">ATUALIZAR</button>
+        </div>
+    `);
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+async function updateAccounting(id) {
+    const data = {
+        id: id,
+        date: document.getElementById('edit-acc-date').value,
+        description: document.getElementById('edit-acc-desc').value,
+        type: document.getElementById('edit-acc-type').value,
+        value: parseFloat(document.getElementById('edit-acc-val').value)
+    };
+
+    if (!data.description || isNaN(data.value)) {
+        return alert("Preencha todos os campos corretamente!");
+    }
+
+    try {
+        await db.ref('contabilidade/' + id).set(data);
+        closeModal();
+        alert("Lançamento atualizado com sucesso!");
+    } catch (e) {
+        alert("Erro ao atualizar: " + e.message);
+    }
+}
+			// FUNÇÃO PARA CRIAR pdf`
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+async function generateBudgetPDF(id) {
+    const o = state.orcamentos.find(x => x.id === id);
+    if (!o) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // ... (código anterior de cabeçalho e dados do cliente)
+
+    // Tabela de Itens com coluna de desconto por item
+    const tableData = o.items.map(item => [
+        item.name,
+        item.qty.toFixed(2),
+        `R$ ${(item.originalPrice || item.price).toFixed(2)}`,
+        item.itemDiscount > 0 ? `R$ ${item.itemDiscount.toFixed(2)}` : "-",
+        `R$ ${(item.qty * item.price).toFixed(2)}`
+    ]);
+
+    doc.autoTable({
+        startY: 58,
+        head: [['PRODUTO', 'QTD', 'V. UNIT', 'DESC. UN.', 'SUBTOTAL']],
+        body: tableData,
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235], halign: 'center' },
+        columnStyles: {
+            2: { halign: 'right' },
+            3: { halign: 'right' },
+            4: { halign: 'right' }
+        }
+    });
+
+    let finalY = doc.lastAutoTable.finalY + 10;
+    const subtotalItens = o.items.reduce((acc, i) => acc + (i.qty * i.price), 0);
+
+    // Bloco de Totais Justificado à Direita
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    
+    const posXLabel = 150; // Posição do texto descritivo
+    const posXValue = 196; // Posição do valor (alinhado à direita)
+
+    doc.text(`SUBTOTAL ITENS:`, posXLabel, finalY, { align: 'right' });
+    doc.text(`R$ ${subtotalItens.toFixed(2)}`, posXValue, finalY, { align: 'right' });
+    finalY += 6;
+
+    if (parseFloat(o.extraValue) > 0) {
+        doc.setTextColor(0, 128, 0);
+        doc.text(`ACRÉSCIMOS (+):`, posXLabel, finalY, { align: 'right' });
+        doc.text(`R$ ${parseFloat(o.extraValue).toFixed(2)}`, posXValue, finalY, { align: 'right' });
+        finalY += 6;
+    }
+
+    if (parseFloat(o.discountValue) > 0) {
+        doc.setTextColor(200, 0, 0);
+        doc.text(`DESCONTO GLOBAL (-):`, posXLabel, finalY, { align: 'right' });
+        doc.text(`R$ ${parseFloat(o.discountValue).toFixed(2)}`, posXValue, finalY, { align: 'right' });
+        finalY += 6;
+    }
+
+    // Total Final em Destaque
+    finalY += 4;
+    doc.setDrawColor(37, 99, 235);
+    doc.line(130, finalY - 4, 196, finalY - 4);
+    
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(37, 99, 235);
+    doc.text(`TOTAL GERAL:`, posXLabel, finalY, { align: 'right' });
+    doc.text(`R$ ${parseFloat(o.total).toFixed(2)}`, posXValue, finalY, { align: 'right' });
+
+    doc.save(`Orcamento_${o.clientName}.pdf`);
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function generateAccountingPDF() {
+			const { jsPDF } = window.jspdf;
+			const doc = new jsPDF();
+			
+			doc.setFontSize(18);
+			doc.text("Relatório de Contabilidade", 105, 20, { align: "center" });
+			
+			const head = [['Data', 'Descrição', 'Tipo', 'Valor']];
+			const body = state.contabilidade
+			     .sort((a,b) => new Date(b.date) - new Date(a.date))
+			     .map(item => [
+			item.date,
+			item.desc,
+			item.type,
+			` ${item.value.toFixed(2)}`
+			     ]);
+			
+			doc.autoTable({
+			     startY: 30,
+			     head: head,
+			     body: body,
+			     headStyles: { fillColor: [41, 128, 185] }
+			});
+			
+			doc.save("Relatorio_Financeiro.pdf");
+			}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+async function sendBudgetWhatsApp(id) {
+    const o = state.orcamentos.find(b => b.id === id);
+    if (!o) {
+        alert("Orçamento não encontrado.");
+        return;
+    }
+
+    // Validação da empresa
+    if (!state.company || !state.company.phone) {
+        alert("Telefone da empresa não configurado.");
+        return;
+    }
+
+    const telefone = state.company.phone.replace(/\D/g, '');
+    if (!telefone) {
+        alert("Telefone inválido.");
+        return;
+    }
+
+    const linhas = [];
+
+    // Cabeçalho
+    linhas.push(`ORÇAMENTO Nº ${o.number}`);
+    linhas.push(`Cliente: ${o.clientName || ''}`);
+    linhas.push(`--------------------------------`);
+
+    // ===== 1) descobrir maior nome de produto =====
+    let maxNomeLen = 0;
+    o.items.forEach(item => {
+        const produto = state.produtos.find(p => p.id === item.productId);
+        const nome = produto ? produto.name : 'Produto';
+        if (nome.length > maxNomeLen) {
+            maxNomeLen = nome.length;
+        }
+    });
+
+    // Cabeçalho da tabela
+    const tituloProduto = 'PRODUTO';
+    const produtoHeader =
+        tituloProduto + '-'.repeat(Math.max(0, maxNomeLen - tituloProduto.length));
+
+    linhas.push(`QTD | ${produtoHeader} | VL.UN | TOTAL`);
+
+    // ===== 2) gerar itens com nomes normalizados =====
+    o.items.forEach(item => {
+        const produto = state.produtos.find(p => p.id === item.productId);
+        let nome = produto ? produto.name : 'Produto';
+
+        if (nome.length < maxNomeLen) {
+            nome = nome + ' '.repeat(maxNomeLen - nome.length);
+        }
+
+        const qtd = item.qty;
+        const unit = Number(item.price || 0).toFixed(2);
+        const total = (item.qty * item.price).toFixed(2);
+
+        linhas.push(`${qtd} x ${nome} - ${unit} = ${total}`);
+    });
+
+    // Rodapé
+    linhas.push(`--------------------------------`);
+    const extra = parseFloat(o.extraValue || 0);
+    const discount = parseFloat(o.discountValue || 0);
+
+    if (extra > 0) {
+       linhas.push(`(+) Acréscimos: R$ ${extra.toFixed(2)}\n`);
+    }
+
+    if (discount > 0) {
+       linhas.push(`(-) Descontos: R$ ${discount.toFixed(2)}\n`);
+    }
+
+   linhas.push(`*TOTAL FINAL: R$ ${parseFloat(o.total).toFixed(2)}*\n`);
+    
+    if (o.obs) {
+       linhas.push(`\n*Obs:* ${o.obs}`);
+    }
+	linhas.push('');
+	linhas.push('Obrigado pela preferência!	');
+	
+	try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(msg);
+        } else {
+            // Fallback para navegadores mais antigos
+            const textArea = document.createElement("textarea");
+            textArea.value = msg;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
+    } catch (err) {
+        console.error('Erro ao copiar texto: ', err);
+    }
+    // Conversão para texto estilo .txt (CRLF)
+    const textoTxt = linhas.join('\r\n');
+	
+
+    // Encode para WhatsApp
+    const textoEncoded = encodeURIComponent(textoTxt);
+
+    // URL WhatsApp Web
+	const url = `https://wa.me/55${telefone}?text=${textoEncoded}`;
+    window.open(url, '_blank');
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+			// --- FUNÇÃO PARA ABRIR O MODAL DE PAGAMENTO ---
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+function calculateBudgetTotal() {
+    totalBudget = budgetItems.reduce((acc, item) => acc + item.total, 0);
+    
+    const displayTotal = document.getElementById('budget-total-display');
+    if (displayTotal) {
+        displayTotal.innerText = `R$ ${totalBudget.toFixed(2)}`;
+    }
+}
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++			
+			function openPaymentModal(id) {
+			 if (!id) return alert("Selecione um orçamento.");
+			 const o = state.orcamentos.find(x => x.id === id);
+			 if (!o) return;
+			 const pendente = o.total - (o.paid || 0);
+			
+			 showModal(`
+			     <h3 class="font-bold mb-4">Registrar Pagamento</h3>
+			     <div class="p-3 bg-slate-100 rounded-lg mb-4 text-center">
+			         <small class="text-blue-600">VALOR PENDENTE</small><br>
+			         <b class="text-lg text-red-600"> ${pendente.toFixed(2)}</b>
+			     </div>
+			     <label>Valor Pago:</label>
+			     <input type="number" id="pay-val" value="${pendente.toFixed(2)}" step="0.01">
+			     
+			     
+			<div class="grid grid-cols-2 gap-3 mt-4">
+			<button onclick="closeModal()" class="bg-slate-200 py-3 rounded-xl font-bold uppercase text-slate-600">
+			Cancelar
+			</button>
+			<button onclick="processPayment('${o.id}')" class="bg-blue-600 text-white py-3 rounded-xl font-bold uppercase shadow-lg">
+			Pagar
+			</button>
+			</div>
+			 `);
+			}
+		</script>
+		<
+		<div id="calc-modal" class="fixed inset-0 bg-blue/50 z-[9999] hidden flex items-center justify-center p-4">
+			<div class="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
+				<div class="p-4 bg-slate-800 text-white flex justify-between items-center">
+					<h3 id="calc-title" class="font-bold">Calculadora</h3>
+					<button onclick="closeCalc()" class="text-2xl">&times;</button>
+				</div>
+				<div class="p-4">
+					<div class="bg-slate-100 p-4 rounded-lg mb-4">
+						<input type="text" id="calc-display" readonly
+							class="w-full text-right text-3xl font-mono bg-transparent outline-none text-slate-800" placeholder="0">
+					</div>
+					<div class="grid grid-cols-4 gap-2">
+						<button onclick="pressCalc('7')" class="p-4 bg-slate-50 rounded-xl font-bold">7</button>
+						<button onclick="pressCalc('8')" class="p-4 bg-slate-50 rounded-xl font-bold">8</button>
+						<button onclick="pressCalc('9')" class="p-4 bg-slate-50 rounded-xl font-bold">9</button>
+						<button onclick="pressCalc('/')" class="p-4 bg-orange-100 text-orange-600 rounded-xl font-bold">/</button>
+						<button onclick="pressCalc('4')" class="p-4 bg-slate-50 rounded-xl font-bold">4</button>
+						<button onclick="pressCalc('5')" class="p-4 bg-slate-50 rounded-xl font-bold">5</button>
+						<button onclick="pressCalc('6')" class="p-4 bg-slate-50 rounded-xl font-bold">6</button>
+						<button onclick="pressCalc('*')" class="p-4 bg-orange-100 text-orange-600 rounded-xl font-bold">*</button>
+						<button onclick="pressCalc('1')" class="p-4 bg-slate-50 rounded-xl font-bold">1</button>
+						<button onclick="pressCalc('2')" class="p-4 bg-slate-50 rounded-xl font-bold">2</button>
+						<button onclick="pressCalc('3')" class="p-4 bg-slate-50 rounded-xl font-bold">3</button>
+						<button onclick="pressCalc('-')" class="p-4 bg-orange-100 text-orange-600 rounded-xl font-bold">-</button>
+						<button onclick="pressCalc('0')" class="p-4 bg-slate-50 rounded-xl font-bold">0</button>
+						<button onclick="pressCalc('.')" class="p-4 bg-slate-50 rounded-xl font-bold">.</button>
+						<button onclick="pressCalc('C')" class="p-4 bg-red-100 text-red-600 rounded-xl font-bold">C</button>
+						<button onclick="pressCalc('+')" class="p-4 bg-orange-100 text-orange-600 rounded-xl font-bold">+</button>
+					</div>
+					<div class="grid grid-cols-3 gap-2 mt-4">
+						<button onclick="closeCalc()" class="p-4 bg-slate-200 rounded-xl font-bold text-sm">CANCELAR</button>
+						<button onclick="solveCalc()" class="p-4 bg-blue-600 text-white rounded-xl font-bold">=</button>
+						<button onclick="transferValue()" class="p-4 bg-green-600 text-white rounded-xl font-bold text-sm">TRANSFERIR</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
 </html>
